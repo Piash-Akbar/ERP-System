@@ -1,0 +1,19 @@
+{
+  "name": "annex-leather-erp",
+  "version": "1.0.0",
+  "description": "Annex Leather ERP System — Web-based ERP for leather manufacturing",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "npm run dev --workspace=server",
+    "client": "npm run dev --workspace=client",
+    "install:all": "npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
