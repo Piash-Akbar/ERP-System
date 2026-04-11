@@ -24,6 +24,9 @@ const MODULES = {
   LOCATIONS: 'locations',
   SETTINGS: 'settings',
   ACTIVITY_LOG: 'activity_log',
+  MANUFACTURING: 'manufacturing',
+  CNF: 'cnf',
+  NOTIFICATIONS: 'notifications',
 };
 
 const PERMISSIONS = {

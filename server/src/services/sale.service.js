@@ -1,8 +1,11 @@
+const mongoose = require('mongoose');
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
 const Contact = require('../models/Contact');
 const ApiError = require('../utils/apiError');
 const { paginate } = require('../utils/pagination');
+const { ROLES } = require('../config/constants');
+const { notify } = require('../utils/notify');
 
 const generateInvoiceNo = async () => {
   const last = await Sale.findOne({ isReturn: false }).sort({ createdAt: -1 }).select('invoiceNo');
@@ -47,10 +50,18 @@ const getById = async (id) => {
   return sale;
 };
 
-const create = async (data, userId) => {
+const create = async (data, user) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
   // Generate invoice number
   data.invoiceNo = await generateInvoiceNo();
-  data.createdBy = userId;
+  data.createdBy = user._id;
+
+  // Check if user has admin override for minimum price
+  const roleName = user.role?.name;
+  const isAdmin = roleName === ROLES.SUPER_ADMIN || roleName === ROLES.ADMIN;
 
   // Calculate totals
   let subtotal = 0;
@@ -63,8 +74,30 @@ const create = async (data, userId) => {
       ? product.variants.id(item.variantId)?.minSellingPrice || 0
       : product.minSellingPrice;
 
-    if (minPrice > 0 && item.unitPrice < minPrice) {
-      throw new ApiError(`Price for ${product.name} cannot be below minimum: ${minPrice}`, 400);
+    if (minPrice > 0 && item.unitPrice < minPrice && !isAdmin) {
+      throw new ApiError(`Price for ${product.name} cannot be below minimum: ৳${minPrice}. Admin override required.`, 400);
+    }
+
+    // Serial number validation for serial-tracked products
+    if (product.serialTracking) {
+      if (!item.serialNumbers || item.serialNumbers.length !== item.quantity) {
+        throw new ApiError(
+          `${product.name} requires exactly ${item.quantity} serial number(s)`,
+          400
+        );
+      }
+
+      for (const serial of item.serialNumbers) {
+        const entry = product.serialNumbers.find(
+          (s) => s.serial === serial && s.status === 'available'
+        );
+        if (!entry) {
+          throw new ApiError(
+            `Serial "${serial}" is not available for ${product.name}`,
+            400
+          );
+        }
+      }
     }
 
     item.subtotal = item.quantity * item.unitPrice - (item.discount || 0);
@@ -88,7 +121,7 @@ const create = async (data, userId) => {
 
   const sale = await Sale.create(data);
 
-  // Update stock
+  // Update stock and mark serials as sold
   for (const item of data.items) {
     const product = await Product.findById(item.product);
     if (item.variantId) {
@@ -101,6 +134,20 @@ const create = async (data, userId) => {
       if (product.stock < item.quantity) throw new ApiError(`Insufficient stock for ${product.name}`, 400);
       product.stock -= item.quantity;
     }
+
+    // Mark serial numbers as sold
+    if (product.serialTracking && item.serialNumbers?.length) {
+      for (const serial of item.serialNumbers) {
+        const entry = product.serialNumbers.find(
+          (s) => s.serial === serial && s.status === 'available'
+        );
+        if (entry) {
+          entry.status = 'sold';
+          entry.soldTo = sale._id;
+        }
+      }
+    }
+
     await product.save();
   }
 
@@ -108,7 +155,39 @@ const create = async (data, userId) => {
   customer.currentDue = (customer.currentDue || 0) + data.dueAmount;
   await customer.save();
 
+  await session.commitTransaction();
+
+  // Notifications (fire-and-forget, outside transaction)
+  notify({
+    user: user._id,
+    title: 'Sale Created',
+    message: `Invoice ${sale.invoiceNo} created for ৳${sale.grandTotal?.toLocaleString()}`,
+    type: 'success',
+    module: 'sales',
+    link: `/sales/${sale._id}`,
+  }).catch(() => {});
+
+  for (const item of data.items) {
+    const prod = await Product.findById(item.product);
+    if (prod && prod.stock <= prod.alertQuantity) {
+      notify({
+        user: user._id,
+        title: 'Low Stock Alert',
+        message: `${prod.name} stock is low (${prod.stock} remaining)`,
+        type: 'warning',
+        module: 'inventory',
+        link: `/inventory`,
+      }).catch(() => {});
+    }
+  }
+
   return sale;
+  } catch (err) {
+    await session.abortTransaction();
+    throw err;
+  } finally {
+    session.endSession();
+  }
 };
 
 const addPayment = async (saleId, payment) => {

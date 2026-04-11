@@ -5,7 +5,8 @@ import DataTable from '../../components/DataTable';
 import PageHeader from '../../components/PageHeader';
 import StatusBadge from '../../components/StatusBadge';
 import toast from 'react-hot-toast';
-import { HiOutlineFunnel, HiOutlineArrowDownTray, HiOutlineExclamationTriangle } from 'react-icons/hi2';
+import { HiOutlineArrowDownTray, HiOutlineExclamationTriangle } from 'react-icons/hi2';
+import { exportToCsv } from '../../utils/exportCsv';
 
 const StockAlerts = () => {
   const { data: rawData, pagination, loading, setPage, setSearch } = useFetch(getProducts, {
@@ -19,7 +20,14 @@ const StockAlerts = () => {
   });
 
   const handleExport = () => {
-    toast.success('Export started');
+    const cols = [
+      { key: 'name', label: 'Product' },
+      { key: 'sku', label: 'SKU' },
+      { key: 'stock', label: 'Current Stock' },
+      { key: 'alertQuantity', label: 'Alert Level' },
+    ];
+    exportToCsv('stock_alerts', cols, data);
+    toast.success('Exported to CSV');
   };
 
   const getStockStatus = (product) => {
@@ -96,19 +104,13 @@ const StockAlerts = () => {
         onSearch={setSearch}
         loading={loading}
         actions={
-          <>
-            <button className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              <HiOutlineFunnel className="w-4 h-4" />
-              Filter
-            </button>
-            <button
-              onClick={handleExport}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <HiOutlineArrowDownTray className="w-4 h-4" />
-              Export
-            </button>
-          </>
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <HiOutlineArrowDownTray className="w-4 h-4" />
+            Export
+          </button>
         }
       />
     </div>

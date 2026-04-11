@@ -27,4 +27,6 @@ const workCenterSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+workCenterSchema.index({ status: 1, isDeleted: 1 });
+
 module.exports = mongoose.model('WorkCenter', workCenterSchema);

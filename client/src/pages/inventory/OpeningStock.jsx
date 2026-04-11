@@ -23,10 +23,10 @@ const OpeningStock = () => {
     if (showForm) {
       getProducts({ limit: 1000 })
         .then((res) => setProducts(res.data.data?.data || res.data.data || []))
-        .catch(() => {});
+        .catch(() => toast.error('Something went wrong'));
       api.get('/warehouses')
         .then((res) => setWarehouses(res.data.data?.data || res.data.data || []))
-        .catch(() => {});
+        .catch(() => toast.error('Something went wrong'));
     }
   }, [showForm]);
 
@@ -91,7 +91,7 @@ const OpeningStock = () => {
     {
       key: 'value',
       label: 'VALUE',
-      render: (row) => <span className="font-medium">${Number(row.value || 0).toLocaleString()}</span>,
+      render: (row) => <span className="font-medium">৳{Number(row.value || 0).toLocaleString()}</span>,
     },
   ];
 

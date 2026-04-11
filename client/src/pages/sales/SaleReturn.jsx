@@ -95,7 +95,7 @@ const SaleReturn = () => {
     {
       key: 'amount',
       label: 'AMOUNT',
-      render: (row) => <span className="font-medium">${(row.returnAmount || row.grandTotal || 0).toLocaleString()}</span>,
+      render: (row) => <span className="font-medium">৳{(row.returnAmount || row.grandTotal || 0).toLocaleString()}</span>,
     },
     {
       key: 'reason',

@@ -6,6 +6,7 @@ const Payroll = require('../models/Payroll');
 const Loan = require('../models/Loan');
 const ApiError = require('../utils/apiError');
 const { paginate } = require('../utils/pagination');
+const { notify, notifyMany } = require('../utils/notify');
 const { ROLES } = require('../config/constants');
 
 // ─── Staff ────────────────────────────────────────────────────
@@ -228,6 +229,18 @@ const generatePayroll = async (month, year) => {
     });
 
     payrolls.push(payroll);
+
+    // Notify each staff member
+    if (staff.user) {
+      notify({
+        user: staff.user,
+        title: 'Payroll Generated',
+        message: `Your payroll for ${month}/${year} has been generated. Net salary: ৳${Math.max(0, netSalary).toLocaleString()}`,
+        type: 'info',
+        module: 'hrm',
+        link: '/hrm/payroll',
+      }).catch(() => {});
+    }
   }
 
   return payrolls;

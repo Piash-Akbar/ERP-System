@@ -22,7 +22,7 @@ const StaffLoans = () => {
   useEffect(() => {
     getStaff({ limit: 200 }).then((res) => {
       setStaffList(res.data.data?.data || res.data.data || []);
-    }).catch(() => {});
+    }).catch(() => toast.error('Something went wrong'));
   }, []);
 
   const handleChange = (e) => {

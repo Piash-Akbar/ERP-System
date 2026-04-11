@@ -30,4 +30,7 @@ const cnfSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+cnfSchema.index({ purchase: 1 });
+cnfSchema.index({ status: 1, isDeleted: 1 });
+
 module.exports = mongoose.model('CNF', cnfSchema);

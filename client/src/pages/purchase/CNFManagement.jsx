@@ -7,8 +7,8 @@ import StatusBadge from '../../components/StatusBadge';
 import Modal from '../../components/Modal';
 import FormInput from '../../components/FormInput';
 import toast from 'react-hot-toast';
+import { exportToCsv } from '../../utils/exportCsv';
 import {
-  HiOutlineFunnel,
   HiOutlineArrowDownTray,
   HiOutlineArrowUpTray,
   HiOutlineDocumentText,
@@ -54,11 +54,14 @@ const CNFManagement = () => {
   };
 
   const handleExport = () => {
-    toast.success('Export started');
-  };
-
-  const handleUpload = () => {
-    toast.success('Upload document feature coming soon');
+    const cols = [
+      { key: 'agent', label: 'CNF Agent' },
+      { key: 'lcNumber', label: 'LC Number' },
+      { key: 'status', label: 'Status' },
+      { key: 'note', label: 'Note' },
+    ];
+    exportToCsv('cnf_records', cols, data || []);
+    toast.success('Exported to CSV');
   };
 
   const columns = [
@@ -121,11 +124,11 @@ const CNFManagement = () => {
     <div>
       <PageHeader title="CNF Management" subtitle="Manage clearing and forwarding agents">
         <button
-          onClick={handleUpload}
+          onClick={() => setShowForm(true)}
           className="flex items-center gap-1.5 px-4 py-2 bg-teal-500 text-white rounded-lg text-sm font-medium hover:bg-teal-600 transition-colors"
         >
           <HiOutlineArrowUpTray className="w-4 h-4" />
-          Upload Document
+          New CNF Entry
         </button>
         <button
           onClick={() => setShowForm(true)}
@@ -144,10 +147,6 @@ const CNFManagement = () => {
         loading={loading}
         actions={
           <>
-            <button className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              <HiOutlineFunnel className="w-4 h-4" />
-              Filter
-            </button>
             <button
               onClick={handleExport}
               className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"

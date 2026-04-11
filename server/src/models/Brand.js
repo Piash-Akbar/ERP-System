@@ -24,4 +24,6 @@ const brandSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+brandSchema.index({ isDeleted: 1 });
+
 module.exports = mongoose.model('Brand', brandSchema);

@@ -56,6 +56,7 @@ const rolesData = [
       { module: MODULES.CONTACTS, actions: [PERMISSIONS.VIEW, PERMISSIONS.CREATE, PERMISSIONS.EDIT] },
       { module: MODULES.PRODUCTS, actions: [PERMISSIONS.VIEW] },
       { module: MODULES.INVENTORY, actions: [PERMISSIONS.VIEW] },
+      { module: MODULES.CNF, actions: Object.values(PERMISSIONS) },
     ],
   },
   {
@@ -65,6 +66,7 @@ const rolesData = [
       { module: MODULES.INVENTORY, actions: Object.values(PERMISSIONS) },
       { module: MODULES.PRODUCTS, actions: [PERMISSIONS.VIEW, PERMISSIONS.CREATE, PERMISSIONS.EDIT] },
       { module: MODULES.TRANSFER, actions: [PERMISSIONS.VIEW, PERMISSIONS.CREATE] },
+      { module: MODULES.MANUFACTURING, actions: [PERMISSIONS.VIEW, PERMISSIONS.CREATE, PERMISSIONS.EDIT] },
     ],
   },
   {

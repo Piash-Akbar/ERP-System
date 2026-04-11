@@ -7,6 +7,7 @@ import DataTable from '../../components/DataTable';
 import PageHeader from '../../components/PageHeader';
 import StatusBadge from '../../components/StatusBadge';
 import SaleDetail from './SaleDetail';
+import { exportToCsv } from '../../utils/exportCsv';
 import toast from 'react-hot-toast';
 
 const paymentStatusColors = { paid: 'green', partial: 'yellow', pending: 'orange', unpaid: 'red' };
@@ -16,7 +17,33 @@ const saleStatuses = ['draft', 'confirmed', 'delivered', 'returned', 'cancelled'
 const SaleList = () => {
   const navigate = useNavigate();
   const [showDetail, setShowDetail] = useState(null);
-  const { data, pagination, loading, setPage, setSearch, refetch } = useFetch(getSales);
+  const [statusFilter, setStatusFilter] = useState('');
+  const { data, pagination, loading, setPage, setSearch, setParams, refetch } = useFetch(getSales);
+
+  const handleFilter = (status) => {
+    setStatusFilter(status);
+    setParams((prev) => ({ ...prev, status: status || undefined, page: 1 }));
+  };
+
+  const handleExport = () => {
+    const exportCols = [
+      { key: 'invoiceNo', label: 'Invoice No' },
+      { key: 'customer', label: 'Customer' },
+      { key: 'saleDate', label: 'Date' },
+      { key: 'grandTotal', label: 'Amount' },
+      { key: 'paidAmount', label: 'Paid' },
+      { key: 'dueAmount', label: 'Due' },
+      { key: 'paymentStatus', label: 'Payment Status' },
+      { key: 'status', label: 'Status' },
+    ];
+    const exportData = (data || []).map((row) => ({
+      ...row,
+      customer: row.customer?.name || '',
+      saleDate: new Date(row.saleDate).toLocaleDateString(),
+    }));
+    exportToCsv('sales', exportCols, exportData);
+    toast.success('Exported to CSV');
+  };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this sale?')) return;
@@ -116,8 +143,11 @@ const SaleList = () => {
         loading={loading}
         actions={
           <>
-            <button className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"><HiOutlineFunnel className="w-4 h-4" />Filter</button>
-            <button className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"><HiOutlineArrowDownTray className="w-4 h-4" />Export</button>
+            <select value={statusFilter} onChange={(e) => handleFilter(e.target.value)} className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">
+              <option value="">All Status</option>
+              {saleStatuses.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+            </select>
+            <button onClick={handleExport} className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"><HiOutlineArrowDownTray className="w-4 h-4" />Export</button>
           </>
         }
       />

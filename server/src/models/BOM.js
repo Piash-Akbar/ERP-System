@@ -31,4 +31,7 @@ const bomSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+bomSchema.index({ product: 1 });
+bomSchema.index({ status: 1, isDeleted: 1 });
+
 module.exports = mongoose.model('BOM', bomSchema);

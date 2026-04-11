@@ -37,4 +37,7 @@ const moneyTransferSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+moneyTransferSchema.index({ fromAccount: 1, toAccount: 1 });
+moneyTransferSchema.index({ date: -1 });
+
 module.exports = mongoose.model('MoneyTransfer', moneyTransferSchema);

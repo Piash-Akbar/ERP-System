@@ -46,7 +46,7 @@ const TransferHistory = () => {
     {
       key: 'amount',
       label: 'AMOUNT',
-      render: (row) => <span className="font-medium">${row.amount?.toLocaleString()}</span>,
+      render: (row) => <span className="font-medium">৳{row.amount?.toLocaleString()}</span>,
     },
     {
       key: 'actions',

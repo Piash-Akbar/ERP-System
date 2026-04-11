@@ -89,9 +89,9 @@ const SaleDetail = ({ saleId, onClose, onRefetch }) => {
                   <tr key={i} className="border-b border-gray-100">
                     <td className="px-4 py-3 text-gray-700">{item.name || item.product?.name}</td>
                     <td className="px-4 py-3 text-center text-gray-700">{item.quantity}</td>
-                    <td className="px-4 py-3 text-center text-gray-700">${item.unitPrice}</td>
-                    <td className="px-4 py-3 text-center text-gray-700">${item.discount || 0}</td>
-                    <td className="px-4 py-3 text-right font-medium text-gray-900">${item.subtotal?.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-center text-gray-700">৳{item.unitPrice}</td>
+                    <td className="px-4 py-3 text-center text-gray-700">৳{item.discount || 0}</td>
+                    <td className="px-4 py-3 text-right font-medium text-gray-900">৳{item.subtotal?.toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>
@@ -103,38 +103,38 @@ const SaleDetail = ({ saleId, onClose, onRefetch }) => {
         <div className="bg-gray-50 rounded-xl p-5 text-sm space-y-2">
           <div className="flex justify-between text-gray-600">
             <span>Subtotal:</span>
-            <span className="text-gray-900">${sale.subtotal?.toLocaleString()}</span>
+            <span className="text-gray-900">৳{sale.subtotal?.toLocaleString()}</span>
           </div>
           {sale.discountAmount > 0 && (
             <div className="flex justify-between text-gray-600">
               <span>Discount:</span>
-              <span className="text-red-600">-${sale.discountAmount?.toLocaleString()}</span>
+              <span className="text-red-600">-৳{sale.discountAmount?.toLocaleString()}</span>
             </div>
           )}
           {sale.taxAmount > 0 && (
             <div className="flex justify-between text-gray-600">
               <span>Tax:</span>
-              <span className="text-gray-900">+${sale.taxAmount?.toLocaleString()}</span>
+              <span className="text-gray-900">+৳{sale.taxAmount?.toLocaleString()}</span>
             </div>
           )}
           {sale.shippingCharge > 0 && (
             <div className="flex justify-between text-gray-600">
               <span>Shipping:</span>
-              <span className="text-gray-900">+${sale.shippingCharge?.toLocaleString()}</span>
+              <span className="text-gray-900">+৳{sale.shippingCharge?.toLocaleString()}</span>
             </div>
           )}
           <hr className="border-gray-200" />
           <div className="flex justify-between font-semibold text-base">
             <span className="text-gray-900">Grand Total:</span>
-            <span className="text-gray-900">${sale.grandTotal?.toLocaleString()}</span>
+            <span className="text-gray-900">৳{sale.grandTotal?.toLocaleString()}</span>
           </div>
           <div className="flex justify-between text-green-600">
             <span>Paid:</span>
-            <span>${sale.paidAmount?.toLocaleString()}</span>
+            <span>৳{sale.paidAmount?.toLocaleString()}</span>
           </div>
           <div className="flex justify-between text-red-600 font-medium">
             <span>Due:</span>
-            <span>${sale.dueAmount?.toLocaleString()}</span>
+            <span>৳{sale.dueAmount?.toLocaleString()}</span>
           </div>
         </div>
 

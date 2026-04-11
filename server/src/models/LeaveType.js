@@ -37,4 +37,6 @@ const leaveTypeSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+leaveTypeSchema.index({ isDeleted: 1, isActive: 1 });
+
 module.exports = mongoose.model('LeaveType', leaveTypeSchema);

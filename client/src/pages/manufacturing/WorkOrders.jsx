@@ -23,9 +23,9 @@ const WorkOrders = () => {
   const { data, pagination, loading, setPage, setSearch, refetch } = useFetch(getWorkOrders);
 
   useEffect(() => {
-    getManufacturingSummary().then((res) => setSummary(res.data.data)).catch(() => {});
-    getProducts({ limit: 200 }).then((res) => setProducts(res.data.data?.data || res.data.data || [])).catch(() => {});
-    getWorkCenters({ limit: 200 }).then((res) => setWorkCenters(res.data.data?.data || res.data.data || [])).catch(() => {});
+    getManufacturingSummary().then((res) => setSummary(res.data.data)).catch(() => toast.error('Something went wrong'));
+    getProducts({ limit: 200 }).then((res) => setProducts(res.data.data?.data || res.data.data || [])).catch(() => toast.error('Something went wrong'));
+    getWorkCenters({ limit: 200 }).then((res) => setWorkCenters(res.data.data?.data || res.data.data || [])).catch(() => toast.error('Something went wrong'));
   }, []);
 
   const handleStatusChange = async (id, status) => {

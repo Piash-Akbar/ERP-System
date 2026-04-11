@@ -53,10 +53,10 @@ const ApplicationsTab = () => {
   const { data, pagination, loading, setPage, setSearch, refetch } = useFetch(getLeaveApplications);
 
   useEffect(() => {
-    getLeaveTypes().then((res) => setLeaveTypesList(res.data.data || [])).catch(() => {});
+    getLeaveTypes().then((res) => setLeaveTypesList(res.data.data || [])).catch(() => toast.error('Something went wrong'));
     getStaff({ limit: 200 }).then((res) => {
       setStaffList(res.data.data?.data || res.data.data || []);
-    }).catch(() => {});
+    }).catch(() => toast.error('Something went wrong'));
   }, []);
 
   const handleApprove = async (id) => {

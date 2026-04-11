@@ -17,7 +17,7 @@ const SubcontractingItems = () => {
   const { data, pagination, loading, setPage, setSearch, refetch } = useFetch(getSubcontractingItems);
 
   useEffect(() => {
-    getContacts({ type: 'supplier', limit: 100 }).then((res) => setSuppliers(res.data.data?.data || res.data.data || [])).catch(() => {});
+    getContacts({ type: 'supplier', limit: 100 }).then((res) => setSuppliers(res.data.data?.data || res.data.data || [])).catch(() => toast.error('Something went wrong'));
   }, []);
 
   const handleDelete = async (id) => {

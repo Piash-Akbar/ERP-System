@@ -8,7 +8,7 @@ import Modal from '../../components/Modal';
 import FormInput from '../../components/FormInput';
 
 const formatCurrency = (val) =>
-  val ? `$${val.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '-';
+  val ? `৳${val.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '-';
 
 const typeColors = {
   Assets: 'blue',

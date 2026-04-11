@@ -22,7 +22,7 @@ const StockAdjustment = () => {
     if (showForm) {
       getProducts({ limit: 1000 })
         .then((res) => setProducts(res.data.data?.data || res.data.data || []))
-        .catch(() => {});
+        .catch(() => toast.error('Something went wrong'));
     }
   }, [showForm]);
 

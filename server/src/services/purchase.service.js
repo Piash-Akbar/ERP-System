@@ -1,8 +1,10 @@
+const mongoose = require('mongoose');
 const Purchase = require('../models/Purchase');
 const Product = require('../models/Product');
 const Contact = require('../models/Contact');
 const ApiError = require('../utils/apiError');
 const { paginate } = require('../utils/pagination');
+const { notify } = require('../utils/notify');
 
 const generateRefNo = async () => {
   const last = await Purchase.findOne({ isReturn: false }).sort({ createdAt: -1 }).select('referenceNo');
@@ -48,47 +50,71 @@ const getById = async (id) => {
 };
 
 const create = async (data, userId) => {
-  data.referenceNo = await generateRefNo();
-  data.createdBy = userId;
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  let subtotal = 0;
-  for (const item of data.items) {
-    item.subtotal = item.quantity * item.unitPrice - (item.discount || 0);
-    subtotal += item.subtotal;
-  }
+  try {
+    data.referenceNo = await generateRefNo();
+    data.createdBy = userId;
 
-  data.subtotal = subtotal;
-  data.grandTotal = subtotal - (data.discountAmount || 0) + (data.taxAmount || 0) + (data.shippingCharge || 0) + (data.otherCharge || 0);
-
-  data.paidAmount = (data.payments || []).reduce((sum, p) => sum + p.amount, 0);
-  data.dueAmount = data.grandTotal - data.paidAmount;
-  data.paymentStatus = data.dueAmount <= 0 ? 'paid' : data.paidAmount > 0 ? 'partial' : 'unpaid';
-
-  const purchase = await Purchase.create(data);
-
-  // Update stock (add)
-  if (data.status === 'received') {
+    let subtotal = 0;
     for (const item of data.items) {
-      const product = await Product.findById(item.product);
-      if (!product) continue;
-      if (item.variantId) {
-        const variant = product.variants.id(item.variantId);
-        if (variant) variant.stock += item.quantity;
-      } else {
-        product.stock += item.quantity;
-      }
-      await product.save();
+      item.subtotal = item.quantity * item.unitPrice - (item.discount || 0);
+      subtotal += item.subtotal;
     }
-  }
 
-  // Update supplier due
-  const supplier = await Contact.findById(data.supplier);
-  if (supplier) {
-    supplier.currentDue = (supplier.currentDue || 0) + data.dueAmount;
-    await supplier.save();
-  }
+    data.subtotal = subtotal;
+    data.grandTotal = subtotal - (data.discountAmount || 0) + (data.taxAmount || 0) + (data.shippingCharge || 0) + (data.otherCharge || 0);
 
-  return purchase;
+    data.paidAmount = (data.payments || []).reduce((sum, p) => sum + p.amount, 0);
+    data.dueAmount = data.grandTotal - data.paidAmount;
+    data.paymentStatus = data.dueAmount <= 0 ? 'paid' : data.paidAmount > 0 ? 'partial' : 'unpaid';
+
+    const purchase = await Purchase.create(data);
+
+    // Update stock (add)
+    if (data.status === 'received') {
+      for (const item of data.items) {
+        const product = await Product.findById(item.product);
+        if (!product) continue;
+        if (item.variantId) {
+          const variant = product.variants.id(item.variantId);
+          if (variant) variant.stock += item.quantity;
+        } else {
+          product.stock += item.quantity;
+        }
+        await product.save();
+      }
+    }
+
+    // Update supplier due
+    const supplier = await Contact.findById(data.supplier);
+    if (supplier) {
+      supplier.currentDue = (supplier.currentDue || 0) + data.dueAmount;
+      await supplier.save();
+    }
+
+    await session.commitTransaction();
+
+    // Notifications (fire-and-forget, outside transaction)
+    if (data.createdBy) {
+      notify({
+        user: data.createdBy,
+        title: 'Purchase Created',
+        message: `Purchase ${purchase.referenceNo} created for ৳${purchase.grandTotal?.toLocaleString()}`,
+        type: 'success',
+        module: 'purchase',
+        link: `/purchase/${purchase._id}`,
+      }).catch(() => {});
+    }
+
+    return purchase;
+  } catch (err) {
+    await session.abortTransaction();
+    throw err;
+  } finally {
+    session.endSession();
+  }
 };
 
 const addPayment = async (purchaseId, payment) => {

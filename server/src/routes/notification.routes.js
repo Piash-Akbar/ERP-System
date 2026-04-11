@@ -9,5 +9,6 @@ router.get('/unread-count', ctrl.getUnreadCount);
 router.put('/mark-all-read', ctrl.markAllAsRead);
 router.put('/:id', ctrl.markAsRead);
 router.delete('/:id', ctrl.deleteNotification);
+// Note: Notification mutations are user-scoped (mark-read, delete own) — activity logging not needed here
 
 module.exports = router;

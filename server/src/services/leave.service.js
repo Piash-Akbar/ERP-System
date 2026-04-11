@@ -4,6 +4,7 @@ const LeaveApplication = require('../models/LeaveApplication');
 const Holiday = require('../models/Holiday');
 const ApiError = require('../utils/apiError');
 const { paginate } = require('../utils/pagination');
+const { notify } = require('../utils/notify');
 
 // ─── Leave Types ──────────────────────────────────────────────
 
@@ -122,6 +123,20 @@ const approveApplication = async (id, userId) => {
   application.approvedBy = userId;
   application.approvedDate = new Date();
   await application.save();
+
+  // Notify the applicant
+  const staff = await mongoose.model('Staff').findById(application.staff);
+  if (staff?.user) {
+    notify({
+      user: staff.user,
+      title: 'Leave Approved',
+      message: `Your leave application (${application.totalDays} days) has been approved`,
+      type: 'success',
+      module: 'leave',
+      link: '/leave/apply',
+    }).catch(() => {});
+  }
+
   return application;
 };
 
@@ -137,6 +152,20 @@ const rejectApplication = async (id, userId, reason) => {
   application.approvedDate = new Date();
   application.rejectionReason = reason || '';
   await application.save();
+
+  // Notify the applicant
+  const staff = await mongoose.model('Staff').findById(application.staff);
+  if (staff?.user) {
+    notify({
+      user: staff.user,
+      title: 'Leave Rejected',
+      message: `Your leave application has been rejected${reason ? `: ${reason}` : ''}`,
+      type: 'error',
+      module: 'leave',
+      link: '/leave/apply',
+    }).catch(() => {});
+  }
+
   return application;
 };
 

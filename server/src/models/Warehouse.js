@@ -35,4 +35,6 @@ const warehouseSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+warehouseSchema.index({ branch: 1, isDeleted: 1 });
+
 module.exports = mongoose.model('Warehouse', warehouseSchema);

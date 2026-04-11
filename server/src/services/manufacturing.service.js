@@ -90,6 +90,14 @@ const getAllPlans = async (query = {}) => {
   });
 };
 
+const getPlanById = async (id) => {
+  const plan = await ProductionPlan.findOne({ _id: id, isDeleted: false })
+    .populate('product', 'name sku')
+    .populate('createdBy', 'name email');
+  if (!plan) throw new ApiError('Production plan not found', 404);
+  return plan;
+};
+
 const createPlan = async (data) => {
   const plan = await ProductionPlan.create(data);
   return plan.populate([
@@ -452,6 +460,7 @@ module.exports = {
   updateBOM,
   deleteBOM,
   getAllPlans,
+  getPlanById,
   createPlan,
   updatePlan,
   deletePlan,

@@ -1,13 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import PageHeader from '../../components/PageHeader';
 import FormInput from '../../components/FormInput';
+import { getContacts } from '../../services/contact.service';
+import { getProducts } from '../../services/product.service';
+import { createSale } from '../../services/sale.service';
 
 const emptyItem = { product: '', name: '', quantity: 1, unitPrice: 0 };
 
 const ProductSale = () => {
   const navigate = useNavigate();
+  const [customers, setCustomers] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
     customer: '',
     date: new Date().toISOString().split('T')[0],
@@ -18,9 +24,34 @@ const ProductSale = () => {
     previousDues: 0,
   });
 
+  useEffect(() => {
+    getContacts({ type: 'customer', limit: 500 })
+      .then((res) => {
+        const d = res.data?.data;
+        setCustomers(Array.isArray(d) ? d : d?.data || d?.docs || []);
+      })
+      .catch(() => toast.error('Failed to load customers'));
+    getProducts({ limit: 500 })
+      .then((res) => {
+        const d = res.data?.data;
+        setProducts(Array.isArray(d) ? d : d?.data || d?.docs || []);
+      })
+      .catch(() => toast.error('Failed to load products'));
+  }, []);
+
   const updateItem = (index, field, value) => {
     const items = [...form.items];
     items[index] = { ...items[index], [field]: value };
+
+    // Auto-fill price when product is selected
+    if (field === 'product' && value) {
+      const prod = products.find((p) => p._id === value);
+      if (prod) {
+        items[index].name = prod.name;
+        items[index].unitPrice = prod.sellingPrice || 0;
+      }
+    }
+
     setForm({ ...form, items });
   };
 
@@ -30,11 +61,38 @@ const ProductSale = () => {
   const subtotal = form.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
   const total = subtotal + form.tax + form.shippingCharge + form.otherCharges + form.previousDues;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.customer) return toast.error('Select a customer');
-    toast.success('Sale created successfully');
-    navigate('/sales');
+    if (!form.items.some((item) => item.product)) return toast.error('Add at least one product');
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        customer: form.customer,
+        saleDate: form.date,
+        items: form.items.filter((item) => item.product).map((item) => ({
+          product: item.product,
+          name: item.name,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          subtotal: item.quantity * item.unitPrice,
+        })),
+        subtotal,
+        taxAmount: form.tax,
+        shippingCharge: form.shippingCharge,
+        otherCharge: form.otherCharges,
+        previousDue: form.previousDues,
+        grandTotal: total,
+      };
+      await createSale(payload);
+      toast.success('Sale created successfully');
+      navigate('/sales');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to create sale');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -48,8 +106,9 @@ const ProductSale = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormInput label="Customer" name="customer" type="select" value={form.customer} onChange={(e) => setForm({ ...form, customer: e.target.value })}>
               <option value="">Select customer</option>
-              <option value="abc">ABC Corp</option>
-              <option value="xyz">XYZ Ltd</option>
+              {customers.map((c) => (
+                <option key={c._id} value={c._id}>{c.name}{c.company ? ` (${c.company})` : ''}</option>
+              ))}
             </FormInput>
             <FormInput label="Date" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
           </div>
@@ -78,13 +137,14 @@ const ProductSale = () => {
                     <td className="py-2 pr-2">
                       <select value={item.product} onChange={(e) => updateItem(i, 'product', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
                         <option value="">Select product</option>
-                        <option value="wallet">Leather Wallet</option>
-                        <option value="belt">Leather Belt</option>
+                        {products.map((p) => (
+                          <option key={p._id} value={p._id}>{p.name} ({p.sku})</option>
+                        ))}
                       </select>
                     </td>
                     <td className="py-2 pr-2"><input type="number" min={1} value={item.quantity} onChange={(e) => updateItem(i, 'quantity', Number(e.target.value))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" /></td>
                     <td className="py-2 pr-2"><input type="number" min={0} value={item.unitPrice} onChange={(e) => updateItem(i, 'unitPrice', Number(e.target.value))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" /></td>
-                    <td className="py-2 pr-2 font-medium text-gray-900">${(item.quantity * item.unitPrice).toFixed(2)}</td>
+                    <td className="py-2 pr-2 font-medium text-gray-900">৳{(item.quantity * item.unitPrice).toFixed(2)}</td>
                     <td className="py-2">{form.items.length > 1 && <button type="button" onClick={() => removeItem(i)} className="text-red-500 hover:text-red-700 text-xs">Remove</button>}</td>
                   </tr>
                 ))}
@@ -108,13 +168,13 @@ const ProductSale = () => {
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h3 className="text-base font-semibold text-gray-900 mb-4">Summary</h3>
             <div className="space-y-3">
-              <div className="flex justify-between text-sm"><span className="text-gray-500">Subtotal</span><span className="text-gray-900">${subtotal.toFixed(2)}</span></div>
-              <div className="flex justify-between text-sm"><span className="text-gray-500">TAX</span><span className="text-gray-900">${form.tax.toFixed(2)}</span></div>
-              <div className="flex justify-between text-sm"><span className="text-gray-500">Shipping</span><span className="text-gray-900">${form.shippingCharge.toFixed(2)}</span></div>
-              <div className="flex justify-between text-sm"><span className="text-gray-500">Other Charges</span><span className="text-gray-900">${form.otherCharges.toFixed(2)}</span></div>
-              <div className="flex justify-between text-sm"><span className="text-gray-500">Previous Dues</span><span className="text-gray-900">${form.previousDues.toFixed(2)}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-500">Subtotal</span><span className="text-gray-900">৳{subtotal.toFixed(2)}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-500">TAX</span><span className="text-gray-900">৳{form.tax.toFixed(2)}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-500">Shipping</span><span className="text-gray-900">৳{form.shippingCharge.toFixed(2)}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-500">Other Charges</span><span className="text-gray-900">৳{form.otherCharges.toFixed(2)}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-500">Previous Dues</span><span className="text-gray-900">৳{form.previousDues.toFixed(2)}</span></div>
               <hr className="border-gray-200" />
-              <div className="flex justify-between"><span className="text-base font-semibold text-gray-900">Total</span><span className="text-2xl font-bold text-gray-900">${total.toFixed(2)}</span></div>
+              <div className="flex justify-between"><span className="text-base font-semibold text-gray-900">Total</span><span className="text-2xl font-bold text-gray-900">৳{total.toFixed(2)}</span></div>
             </div>
           </div>
         </div>
@@ -122,7 +182,9 @@ const ProductSale = () => {
         {/* Actions */}
         <div className="flex items-center justify-end gap-3">
           <button type="button" onClick={() => navigate('/sales')} className="px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg">Cancel</button>
-          <button type="submit" className="px-6 py-2.5 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700">Create Sale</button>
+          <button type="submit" disabled={submitting} className="px-6 py-2.5 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50">
+            {submitting ? 'Creating...' : 'Create Sale'}
+          </button>
         </div>
       </form>
     </div>

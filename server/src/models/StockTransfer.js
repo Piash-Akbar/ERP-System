@@ -42,4 +42,7 @@ const stockTransferSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+stockTransferSchema.index({ fromWarehouse: 1, toWarehouse: 1 });
+stockTransferSchema.index({ status: 1 });
+
 module.exports = mongoose.model('StockTransfer', stockTransferSchema);

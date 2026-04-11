@@ -22,8 +22,8 @@ const ProductionPlanning = () => {
   const { data, pagination, loading, setPage, setSearch, refetch } = useFetch(getPlans);
 
   useEffect(() => {
-    getManufacturingSummary().then((res) => setSummary(res.data.data)).catch(() => {});
-    getProducts({ limit: 200 }).then((res) => setProducts(res.data.data?.data || res.data.data || [])).catch(() => {});
+    getManufacturingSummary().then((res) => setSummary(res.data.data)).catch(() => toast.error('Failed to load summary'));
+    getProducts({ limit: 200 }).then((res) => setProducts(res.data.data?.data || res.data.data || [])).catch(() => toast.error('Failed to load products'));
   }, []);
 
   const handleStatusChange = async (id, status) => {

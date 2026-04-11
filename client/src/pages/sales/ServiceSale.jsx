@@ -1,27 +1,49 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { HiOutlineFunnel, HiOutlineArrowDownTray } from 'react-icons/hi2';
 import PageHeader from '../../components/PageHeader';
 import toast from 'react-hot-toast';
+import { getSales, updateSaleStatus } from '../../services/sale.service';
 
-const serviceStatuses = ['Pending', 'In Progress', 'Completed', 'Cancelled'];
-const statusBg = { Completed: 'bg-green-50 text-green-700', 'In Progress': 'bg-yellow-50 text-yellow-700', Pending: 'bg-orange-50 text-orange-700', Cancelled: 'bg-red-50 text-red-700' };
-
-const initialData = [
-  { id: 'SRV-001', customer: 'ABC Corp', service: 'Consultation', date: '2026-03-25', amount: 450, status: 'Completed' },
-  { id: 'SRV-002', customer: 'Tech Solutions', service: 'Maintenance', date: '2026-03-24', amount: 800, status: 'In Progress' },
-  { id: 'SRV-003', customer: 'Rafiq Trading', service: 'Leather Finishing', date: '2026-03-22', amount: 1200, status: 'Pending' },
-];
+const saleStatuses = ['draft', 'confirmed', 'delivered', 'returned', 'cancelled'];
+const statusBg = {
+  confirmed: 'bg-green-50 text-green-700',
+  delivered: 'bg-blue-50 text-blue-700',
+  draft: 'bg-orange-50 text-orange-700',
+  cancelled: 'bg-red-50 text-red-700',
+  returned: 'bg-yellow-50 text-yellow-700',
+};
 
 const ServiceSale = () => {
   const [search, setSearch] = useState('');
-  const [data, setData] = useState(initialData);
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleStatusChange = (id, newStatus) => {
-    setData((prev) => prev.map((row) => row.id === id ? { ...row, status: newStatus } : row));
-    toast.success('Status updated');
+  const fetchData = () => {
+    getSales({ type: 'service' })
+      .then((res) => {
+        const d = res.data?.data;
+        setData(Array.isArray(d) ? d : d?.data || d?.docs || []);
+      })
+      .catch(() => toast.error('Failed to load service sales'))
+      .finally(() => setLoading(false));
   };
 
-  const filtered = data.filter((d) => d.customer.toLowerCase().includes(search.toLowerCase()) || d.id.toLowerCase().includes(search.toLowerCase()));
+  useEffect(() => { fetchData(); }, []);
+
+  const handleStatusChange = async (id, newStatus) => {
+    try {
+      await updateSaleStatus(id, newStatus);
+      setData((prev) => prev.map((row) => row._id === id ? { ...row, status: newStatus } : row));
+      toast.success('Status updated');
+    } catch {
+      toast.error('Failed to update status');
+    }
+  };
+
+  const filtered = data.filter((d) => {
+    const term = search.toLowerCase();
+    return (d.customer?.name || '').toLowerCase().includes(term) || (d.invoiceNo || '').toLowerCase().includes(term);
+  });
 
   return (
     <div>
@@ -41,29 +63,31 @@ const ServiceSale = () => {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-4 py-3 font-medium text-gray-600">SERVICE ID</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">INVOICE NO</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">CUSTOMER</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">SERVICE</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">DATE</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">AMOUNT</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">STATUS</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((row) => (
-                <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-900">{row.id}</td>
-                  <td className="px-4 py-3 text-gray-700">{row.customer}</td>
-                  <td className="px-4 py-3 text-gray-700">{row.service}</td>
-                  <td className="px-4 py-3 text-gray-700">{row.date}</td>
-                  <td className="px-4 py-3 font-medium text-gray-900">${row.amount}</td>
+              {loading ? (
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">Loading...</td></tr>
+              ) : filtered.length === 0 ? (
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">No service sales found</td></tr>
+              ) : filtered.map((row) => (
+                <tr key={row._id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="px-4 py-3 font-medium text-gray-900">{row.invoiceNo}</td>
+                  <td className="px-4 py-3 text-gray-700">{row.customer?.name || '-'}</td>
+                  <td className="px-4 py-3 text-gray-700">{new Date(row.saleDate).toLocaleDateString()}</td>
+                  <td className="px-4 py-3 font-medium text-gray-900">৳{row.grandTotal?.toLocaleString()}</td>
                   <td className="px-4 py-3">
                     <select
                       value={row.status}
-                      onChange={(e) => handleStatusChange(row.id, e.target.value)}
+                      onChange={(e) => handleStatusChange(row._id, e.target.value)}
                       className={`px-2 py-1 text-xs font-medium rounded-lg border-0 cursor-pointer focus:ring-2 focus:ring-orange-400 ${statusBg[row.status] || 'bg-gray-50 text-gray-700'}`}
                     >
-                      {serviceStatuses.map((s) => <option key={s} value={s}>{s}</option>)}
+                      {saleStatuses.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </td>
                 </tr>

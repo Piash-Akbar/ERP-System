@@ -1,5 +1,26 @@
 const mongoose = require('mongoose');
 
+const journalEntrySchema = new mongoose.Schema(
+  {
+    accountName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    debit: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    credit: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+  },
+  { _id: false }
+);
+
 const transactionSchema = new mongoose.Schema(
   {
     type: {
@@ -34,6 +55,7 @@ const transactionSchema = new mongoose.Schema(
       trim: true,
     },
     attachments: [String],
+    journalEntries: [journalEntrySchema],
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -47,5 +69,6 @@ const transactionSchema = new mongoose.Schema(
 );
 
 transactionSchema.index({ type: 1, date: -1 });
+transactionSchema.index({ isDeleted: 1, date: -1 });
 
 module.exports = mongoose.model('Transaction', transactionSchema);

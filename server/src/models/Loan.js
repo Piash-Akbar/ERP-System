@@ -48,4 +48,6 @@ loanSchema.pre('save', function (next) {
   next();
 });
 
+loanSchema.index({ staff: 1, status: 1 });
+
 module.exports = mongoose.model('Loan', loanSchema);

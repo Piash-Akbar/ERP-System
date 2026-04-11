@@ -24,8 +24,8 @@ const SubcontractingOrders = () => {
   const { data, pagination, loading, setPage, setSearch, refetch } = useFetch(getSubcontractingOrders);
 
   useEffect(() => {
-    getContacts({ type: 'supplier', limit: 100 }).then((res) => setSuppliers(res.data.data?.data || res.data.data || [])).catch(() => {});
-    getSubcontractingItems({ limit: 200 }).then((res) => setScItems(res.data.data?.data || res.data.data || [])).catch(() => {});
+    getContacts({ type: 'supplier', limit: 100 }).then((res) => setSuppliers(res.data.data?.data || res.data.data || [])).catch(() => toast.error('Something went wrong'));
+    getSubcontractingItems({ limit: 200 }).then((res) => setScItems(res.data.data?.data || res.data.data || [])).catch(() => toast.error('Something went wrong'));
   }, []);
 
   const handleStatusChange = async (id, status) => {

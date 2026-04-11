@@ -26,4 +26,7 @@ const productionPlanSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+productionPlanSchema.index({ status: 1, isDeleted: 1 });
+productionPlanSchema.index({ startDate: -1, endDate: -1 });
+
 module.exports = mongoose.model('ProductionPlan', productionPlanSchema);

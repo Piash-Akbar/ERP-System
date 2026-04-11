@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import {
   HiOutlineCurrencyDollar,
   HiOutlineExclamationCircle,
@@ -18,7 +19,7 @@ const periods = [
   { key: 'year', label: 'Financial Year' },
 ];
 
-const fmt = (n) => `$${(n || 0).toLocaleString()}`;
+const fmt = (n) => `৳${(n || 0).toLocaleString()}`;
 
 const Dashboard = () => {
   const [period, setPeriod] = useState('year');
@@ -30,14 +31,14 @@ const Dashboard = () => {
     setLoading(true);
     getDashboardSummary(period)
       .then((res) => setSummary(res.data.data))
-      .catch(() => {})
+      .catch(() => toast.error('Something went wrong'))
       .finally(() => setLoading(false));
   }, [period]);
 
   useEffect(() => {
     getDashboardChart()
       .then((res) => setChartData(res.data.data))
-      .catch(() => {});
+      .catch(() => toast.error('Something went wrong'));
   }, []);
 
   const cards = summary?.cards || {};
@@ -77,7 +78,7 @@ const Dashboard = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             <SummaryCard
               title="Total Revenue"
-              value={fmt(cards.totalSales || 245680)}
+              value={fmt(cards.totalSales || 0)}
               subtitle={`Revenue for ${period === 'today' ? 'today' : period === 'week' ? 'this week' : period === 'month' ? 'this month' : 'financial year'}`}
               icon={HiOutlineCurrencyDollar}
               iconBg="bg-blue-50"
@@ -85,7 +86,7 @@ const Dashboard = () => {
             />
             <SummaryCard
               title="Total Dues"
-              value={fmt(cards.salesDue || 48200)}
+              value={fmt(cards.salesDue || 0)}
               subtitle="14.5% due still remains"
               icon={HiOutlineExclamationCircle}
               iconBg="bg-red-50"
@@ -93,7 +94,7 @@ const Dashboard = () => {
             />
             <SummaryCard
               title="Expenses"
-              value={fmt(cards.totalExpense || 128450)}
+              value={fmt(cards.totalExpense || 0)}
               subtitle="Total expenses this period"
               icon={HiOutlineCurrencyDollar}
               iconBg="bg-orange-50"
@@ -101,7 +102,7 @@ const Dashboard = () => {
             />
             <SummaryCard
               title="Net Profit"
-              value={fmt(cards.netProfit || 92560)}
+              value={fmt(cards.netProfit || 0)}
               subtitle="Revenue - Expenses"
               icon={HiOutlineCurrencyDollar}
               iconBg="bg-green-50"
@@ -113,28 +114,28 @@ const Dashboard = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <MiniCard
               title="Purchase Due"
-              value={fmt(cards.purchaseDue || 32100)}
+              value={fmt(cards.purchaseDue || 0)}
               icon={HiOutlineCurrencyDollar}
               iconBg="bg-orange-50"
               iconColor="text-orange-500"
             />
             <MiniCard
               title="Invoice Due"
-              value={fmt(cards.customerDue || 16890)}
+              value={fmt(cards.customerDue || 0)}
               icon={HiOutlineCurrencyDollar}
               iconBg="bg-red-50"
               iconColor="text-red-500"
             />
             <MiniCard
               title="Total in Bank"
-              value={fmt(cards.bankBalance || 456780)}
+              value={fmt(cards.bankBalance || 0)}
               icon={HiOutlineBuildingLibrary}
               iconBg="bg-blue-50"
               iconColor="text-blue-500"
             />
             <MiniCard
               title="Cash in Hand"
-              value={fmt(cards.cashBalance || 34560)}
+              value={fmt(cards.cashBalance || 0)}
               icon={HiOutlineBanknotes}
               iconBg="bg-green-50"
               iconColor="text-green-500"
@@ -164,7 +165,7 @@ const Dashboard = () => {
                   <XAxis dataKey="month" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                   <Tooltip
-                    formatter={(val) => `$${val.toLocaleString()}`}
+                    formatter={(val) => `৳${val.toLocaleString()}`}
                     contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '12px' }}
                   />
                   <Bar dataKey="sales" name="Sales" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={16} />
@@ -190,7 +191,7 @@ const Dashboard = () => {
                   <XAxis dataKey="month" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                   <Tooltip
-                    formatter={(val) => `$${val.toLocaleString()}`}
+                    formatter={(val) => `৳${val.toLocaleString()}`}
                     contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '12px' }}
                   />
                   <defs>
@@ -240,7 +241,7 @@ const Dashboard = () => {
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                 <Tooltip
-                  formatter={(val) => `$${val.toLocaleString()}`}
+                  formatter={(val) => `৳${val.toLocaleString()}`}
                   contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '12px' }}
                 />
                 <Bar dataKey="inflow" name="Inflow" fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={20} />

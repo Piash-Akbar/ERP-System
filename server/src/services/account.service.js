@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Transaction = require('../models/Transaction');
 const BankAccount = require('../models/BankAccount');
 const ApiError = require('../utils/apiError');
@@ -43,20 +44,52 @@ const getTransactions = async (query = {}) => {
 };
 
 const createTransaction = async (data, userId) => {
-  const transaction = await Transaction.create({
-    ...data,
-    createdBy: userId,
-  });
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  // Update bank account balance
-  if (transaction.account) {
-    const balanceChange = transaction.type === 'income' ? transaction.amount : -transaction.amount;
-    await BankAccount.findByIdAndUpdate(transaction.account, {
-      $inc: { currentBalance: balanceChange },
+  try {
+    // Build double-entry journal entries
+    let accountName = 'Cash';
+    if (data.account) {
+      const bankAccount = await BankAccount.findById(data.account);
+      if (bankAccount) accountName = bankAccount.name;
+    }
+
+    const journalEntries = [];
+    if (data.type === 'income') {
+      journalEntries.push(
+        { accountName, debit: data.amount, credit: 0 },
+        { accountName: data.category, debit: 0, credit: data.amount }
+      );
+    } else {
+      journalEntries.push(
+        { accountName: data.category, debit: data.amount, credit: 0 },
+        { accountName, debit: 0, credit: data.amount }
+      );
+    }
+
+    const transaction = await Transaction.create({
+      ...data,
+      journalEntries,
+      createdBy: userId,
     });
-  }
 
-  return transaction;
+    // Update bank account balance
+    if (transaction.account) {
+      const balanceChange = transaction.type === 'income' ? transaction.amount : -transaction.amount;
+      await BankAccount.findByIdAndUpdate(transaction.account, {
+        $inc: { currentBalance: balanceChange },
+      });
+    }
+
+    await session.commitTransaction();
+    return transaction;
+  } catch (err) {
+    await session.abortTransaction();
+    throw err;
+  } finally {
+    session.endSession();
+  }
 };
 
 const deleteTransaction = async (id) => {

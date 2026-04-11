@@ -9,7 +9,7 @@ import FormInput from '../../components/FormInput';
 import { getIncomes, createIncome, deleteIncome } from '../../services/account.service';
 
 const formatCurrency = (val) =>
-  `$${(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  `৳${(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const sources = ['Product Sales', 'Service Income', 'Other Income'];
 const paymentMethods = ['Bank Transfer', 'Cash', 'Credit Card', 'Check'];

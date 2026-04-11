@@ -19,4 +19,6 @@ const holidaySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+holidaySchema.index({ date: 1 });
+
 module.exports = mongoose.model('Holiday', holidaySchema);

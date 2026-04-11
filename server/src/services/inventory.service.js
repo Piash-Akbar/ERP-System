@@ -93,29 +93,42 @@ const adjustStock = async (data, userId) => {
 };
 
 const transferStock = async (data, userId) => {
+  if (String(data.fromWarehouse) === String(data.toWarehouse)) {
+    throw new ApiError('Source and destination warehouse cannot be the same', 400);
+  }
+
   const product = await Product.findOne({ _id: data.product, isDeleted: false });
   if (!product) {
     throw new ApiError('Product not found', 404);
   }
 
-  if (data.variantId) {
-    const variant = product.variants.id(data.variantId);
-    if (!variant) {
-      throw new ApiError('Variant not found', 404);
-    }
-    if (variant.stock < data.quantity) {
-      throw new ApiError('Insufficient stock in source warehouse for this variant', 400);
-    }
-    // For transfers between warehouses, adjust the variant stock
-    // (simplified: product-level stock adjustment)
-  } else {
-    if (product.stock < data.quantity) {
-      throw new ApiError('Insufficient stock in source warehouse', 400);
-    }
-    // Stock stays the same at product level for warehouse transfers
-    // since Product model has a single stock field.
-    // The transfer is recorded for tracking purposes.
+  // Check source warehouse stock
+  const fromEntry = product.warehouseStock.find(
+    (ws) => String(ws.warehouse) === String(data.fromWarehouse)
+  );
+  const sourceQty = fromEntry ? fromEntry.quantity : 0;
+
+  if (sourceQty < data.quantity) {
+    throw new ApiError('Insufficient stock in source warehouse', 400);
   }
+
+  // Deduct from source warehouse
+  fromEntry.quantity -= data.quantity;
+
+  // Add to destination warehouse
+  const toEntry = product.warehouseStock.find(
+    (ws) => String(ws.warehouse) === String(data.toWarehouse)
+  );
+  if (toEntry) {
+    toEntry.quantity += data.quantity;
+  } else {
+    product.warehouseStock.push({
+      warehouse: data.toWarehouse,
+      quantity: data.quantity,
+    });
+  }
+
+  await product.save();
 
   const transfer = await StockTransfer.create({
     product: data.product,
@@ -212,6 +225,25 @@ const getTransfers = async (query) => {
   return result;
 };
 
+const getAdjustmentById = async (id) => {
+  const adj = await StockAdjustment.findById(id)
+    .populate('product', 'name sku')
+    .populate('warehouse', 'name')
+    .populate('adjustedBy', 'name email');
+  if (!adj) throw new ApiError('Adjustment not found', 404);
+  return adj;
+};
+
+const getTransferById = async (id) => {
+  const transfer = await StockTransfer.findById(id)
+    .populate('product', 'name sku')
+    .populate('fromWarehouse', 'name')
+    .populate('toWarehouse', 'name')
+    .populate('transferredBy', 'name email');
+  if (!transfer) throw new ApiError('Transfer not found', 404);
+  return transfer;
+};
+
 module.exports = {
   getStockList,
   getLowStock,
@@ -219,5 +251,7 @@ module.exports = {
   transferStock,
   getMovements,
   getAdjustments,
+  getAdjustmentById,
   getTransfers,
+  getTransferById,
 };

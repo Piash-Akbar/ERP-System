@@ -12,7 +12,7 @@ exports.getSale = asyncHandler(async (req, res) => {
 });
 
 exports.createSale = asyncHandler(async (req, res) => {
-  const sale = await saleService.create(req.body, req.user._id);
+  const sale = await saleService.create(req.body, req.user);
   res.status(201).json({ success: true, data: sale, message: 'Sale created' });
 });
 

@@ -12,4 +12,6 @@ const subcontractingItemSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+subcontractingItemSchema.index({ supplier: 1, isDeleted: 1 });
+
 module.exports = mongoose.model('SubcontractingItem', subcontractingItemSchema);

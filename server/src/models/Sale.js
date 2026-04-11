@@ -34,6 +34,7 @@ const saleItemSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    serialNumbers: [String],
   },
   { _id: true }
 );

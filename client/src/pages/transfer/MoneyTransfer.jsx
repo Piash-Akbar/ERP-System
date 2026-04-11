@@ -22,7 +22,7 @@ const MoneyTransfer = () => {
   useEffect(() => {
     api.get('/accounts/bank-accounts')
       .then((res) => setAccounts(res.data.data?.data || res.data.data || []))
-      .catch(() => {});
+      .catch(() => toast.error('Failed to load bank accounts'));
   }, []);
 
   const handleChange = (e) => {
@@ -70,7 +70,7 @@ const MoneyTransfer = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormInput label="Amount *" name="amount" type="number" value={form.amount} onChange={handleChange} placeholder="$ 0.00" min="0" step="0.01" required />
+          <FormInput label="Amount *" name="amount" type="number" value={form.amount} onChange={handleChange} placeholder="৳ 0.00" min="0" step="0.01" required />
           <FormInput label="Transfer Date *" name="date" type="date" value={form.date} onChange={handleChange} />
         </div>
 

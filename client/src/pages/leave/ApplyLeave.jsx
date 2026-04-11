@@ -33,8 +33,8 @@ const ApplyLeave = () => {
   });
 
   useEffect(() => {
-    getLeaveTypes().then((res) => setLeaveTypes(res.data.data || [])).catch(() => {});
-    getStaff({ limit: 200 }).then((res) => setStaffList(res.data.data?.data || res.data.data || [])).catch(() => {});
+    getLeaveTypes().then((res) => setLeaveTypes(res.data.data || [])).catch(() => toast.error('Failed to load leave types'));
+    getStaff({ limit: 200 }).then((res) => setStaffList(res.data.data?.data || res.data.data || [])).catch(() => toast.error('Failed to load staff'));
   }, []);
 
   // Fetch balance when staff changes

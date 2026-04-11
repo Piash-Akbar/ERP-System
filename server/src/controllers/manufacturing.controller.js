@@ -35,6 +35,11 @@ const getPlans = asyncHandler(async (req, res) => {
   res.json({ success: true, data: result, message: 'Production plans retrieved' });
 });
 
+const getPlanById = asyncHandler(async (req, res) => {
+  const plan = await mfgService.getPlanById(req.params.id);
+  res.json({ success: true, data: plan, message: 'Production plan retrieved' });
+});
+
 const createPlan = asyncHandler(async (req, res) => {
   const plan = await mfgService.createPlan(req.body);
   res.status(201).json({ success: true, data: plan, message: 'Production plan created' });
@@ -157,6 +162,7 @@ module.exports = {
   updateBOM,
   deleteBOM,
   getPlans,
+  getPlanById,
   createPlan,
   updatePlan,
   deletePlan,

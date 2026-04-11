@@ -46,8 +46,8 @@ const AddStaff = () => {
   });
 
   useEffect(() => {
-    api.get('/auth/roles').then((res) => setRoles(res.data.data || [])).catch(() => {});
-    getBranches().then((res) => setBranches(res.data.data || [])).catch(() => {});
+    api.get('/auth/roles').then((res) => setRoles(res.data.data || [])).catch(() => toast.error('Something went wrong'));
+    getBranches().then((res) => setBranches(res.data.data || [])).catch(() => toast.error('Something went wrong'));
   }, []);
 
   const handleChange = (e) => {

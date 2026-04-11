@@ -40,4 +40,7 @@ const stockAdjustmentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+stockAdjustmentSchema.index({ product: 1, warehouse: 1 });
+stockAdjustmentSchema.index({ adjustedBy: 1 });
+
 module.exports = mongoose.model('StockAdjustment', stockAdjustmentSchema);

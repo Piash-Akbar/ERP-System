@@ -26,8 +26,8 @@ const ProductList = () => {
   });
 
   useEffect(() => {
-    getCategories().then((res) => setCategories(res.data.data || [])).catch(() => {});
-    getBrands().then((res) => setBrands(res.data.data || [])).catch(() => {});
+    getCategories().then((res) => setCategories(res.data.data || [])).catch(() => toast.error('Something went wrong'));
+    getBrands().then((res) => setBrands(res.data.data || [])).catch(() => toast.error('Something went wrong'));
   }, []);
 
   const handleFilterChange = (key, value) => {
@@ -87,12 +87,12 @@ const ProductList = () => {
     {
       key: 'purchasePrice',
       label: 'Purchase Price',
-      render: (row) => `${row.purchasePrice?.toFixed(2)}`,
+      render: (row) => `৳${row.purchasePrice?.toFixed(2)}`,
     },
     {
       key: 'sellingPrice',
       label: 'Selling Price',
-      render: (row) => `${row.sellingPrice?.toFixed(2)}`,
+      render: (row) => `৳${row.sellingPrice?.toFixed(2)}`,
     },
     {
       key: 'stock',

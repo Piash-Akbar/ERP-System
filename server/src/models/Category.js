@@ -41,4 +41,6 @@ categorySchema.pre('save', function (next) {
   next();
 });
 
+categorySchema.index({ parent: 1, isDeleted: 1 });
+
 module.exports = mongoose.model('Category', categorySchema);

@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Role = require('../models/Role');
 const { generateAccessToken, generateRefreshToken } = require('../utils/generateToken');
+const sendEmail = require('../utils/sendEmail');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { ROLES } = require('../config/constants');
@@ -99,9 +100,20 @@ const forgotPassword = async (email) => {
   user.passwordResetExpires = Date.now() + 30 * 60 * 1000; // 30 minutes
   await user.save();
 
-  // TODO: Send email with reset link
-  // For now, return token (remove in production)
-  return { message: 'Password reset link sent', resetToken };
+  const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
+
+  await sendEmail({
+    to: user.email,
+    subject: 'Password Reset — Annex Leather ERP',
+    html: `
+      <h2>Password Reset Request</h2>
+      <p>You requested a password reset. Click the link below to set a new password:</p>
+      <p><a href="${resetUrl}" style="display:inline-block;padding:10px 20px;background:#f97316;color:#fff;border-radius:6px;text-decoration:none;">Reset Password</a></p>
+      <p>This link expires in 30 minutes. If you didn't request this, please ignore this email.</p>
+    `,
+  });
+
+  return { message: 'If an account exists, a reset link has been sent' };
 };
 
 const resetPassword = async (token, newPassword) => {

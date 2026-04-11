@@ -27,4 +27,8 @@ const workOrderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+workOrderSchema.index({ status: 1, isDeleted: 1 });
+workOrderSchema.index({ dueDate: 1 });
+workOrderSchema.index({ workCenter: 1 });
+
 module.exports = mongoose.model('WorkOrder', workOrderSchema);

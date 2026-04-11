@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/auth.controller');
 const { protect } = require('../middlewares/auth');
+const { logActivity } = require('../middlewares/activityLogger');
 const { validate } = require('../middlewares/validate');
 const {
   registerSchema,
@@ -23,8 +24,8 @@ router.post('/reset-password', validate(resetPasswordSchema), authController.res
 router.get('/users', protect, authController.getUsers);
 router.get('/roles', protect, authController.getRoles);
 router.get('/profile', protect, authController.getProfile);
-router.put('/profile', protect, validate(updateProfileSchema), authController.updateProfile);
-router.post('/change-password', protect, validate(changePasswordSchema), authController.changePassword);
+router.put('/profile', protect, validate(updateProfileSchema), logActivity('auth', 'Updated profile'), authController.updateProfile);
+router.post('/change-password', protect, validate(changePasswordSchema), logActivity('auth', 'Changed password'), authController.changePassword);
 router.post('/logout', protect, authController.logout);
 
 module.exports = router;

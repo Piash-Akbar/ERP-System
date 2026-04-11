@@ -29,4 +29,7 @@ const subcontractingOrderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+subcontractingOrderSchema.index({ supplier: 1, status: 1 });
+subcontractingOrderSchema.index({ dueDate: 1 });
+
 module.exports = mongoose.model('SubcontractingOrder', subcontractingOrderSchema);

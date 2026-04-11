@@ -23,11 +23,11 @@ const StockTransferForm = ({ onClose, onSuccess }) => {
   useEffect(() => {
     getProducts({ limit: 1000 })
       .then((res) => setProducts(res.data.data?.data || res.data.data || []))
-      .catch(() => {});
+      .catch(() => toast.error('Something went wrong'));
 
     api.get('/warehouses')
       .then((res) => setWarehouses(res.data.data?.data || res.data.data || []))
-      .catch(() => {});
+      .catch(() => toast.error('Something went wrong'));
   }, []);
 
   const handleChange = (e) => {

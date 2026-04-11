@@ -49,7 +49,7 @@ const ProductForm = ({ product, onClose, onSuccess }) => {
         setUnits(unitRes.data.data || []);
         setTaxes(taxRes.data.data || []);
       })
-      .catch(() => {});
+      .catch(() => toast.error('Something went wrong'));
   }, []);
 
   useEffect(() => {

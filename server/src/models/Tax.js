@@ -24,4 +24,6 @@ const taxSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+taxSchema.index({ isDeleted: 1 });
+
 module.exports = mongoose.model('Tax', taxSchema);

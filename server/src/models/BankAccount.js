@@ -48,4 +48,7 @@ const bankAccountSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+bankAccountSchema.index({ isDeleted: 1, isActive: 1 });
+bankAccountSchema.index({ type: 1 });
+
 module.exports = mongoose.model('BankAccount', bankAccountSchema);

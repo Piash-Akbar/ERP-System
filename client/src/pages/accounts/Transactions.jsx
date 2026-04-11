@@ -1,31 +1,50 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { HiOutlineFunnel, HiOutlineArrowDownTray, HiOutlineEye } from 'react-icons/hi2';
+import { HiOutlineArrowDownTray, HiOutlineEye } from 'react-icons/hi2';
+import { exportToCsv } from '../../utils/exportCsv';
 import PageHeader from '../../components/PageHeader';
 import DataTable from '../../components/DataTable';
 import StatusBadge from '../../components/StatusBadge';
+import { getTransactions } from '../../services/account.service';
 
 const formatCurrency = (val) =>
-  `$${Math.abs(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  `৳${Math.abs(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const typeColors = {
-  Sale: 'green',
-  Expense: 'red',
-  Purchase: 'orange',
-  Income: 'blue',
+  income: 'green',
+  expense: 'red',
 };
 
-const demoTransactions = [
-  { _id: '1', transactionId: 'TXN-001', date: '2026-03-25', description: 'Product Sale - ABC Corp', type: 'Sale', amount: 15600, account: 'Cash' },
-  { _id: '2', transactionId: 'TXN-002', date: '2026-03-25', description: 'Office Rent Payment', type: 'Expense', amount: -5000, account: 'Bank - City Bank' },
-  { _id: '3', transactionId: 'TXN-003', date: '2026-03-24', description: 'Purchase - XYZ Suppliers', type: 'Purchase', amount: -8900, account: 'Accounts Payable' },
-  { _id: '4', transactionId: 'TXN-004', date: '2026-03-24', description: 'Service Income', type: 'Income', amount: 2500, account: 'Cash' },
-];
-
 const Transactions = () => {
-  const [transactions] = useState(demoTransactions);
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleExport = () => toast.success('Export started');
+  useEffect(() => {
+    getTransactions()
+      .then((res) => {
+        const d = res.data?.data;
+        setTransactions(Array.isArray(d) ? d : d?.data || d?.docs || []);
+      })
+      .catch(() => toast.error('Failed to load transactions'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleExport = () => {
+    const cols = [
+      { key: 'type', label: 'Type' },
+      { key: 'category', label: 'Category' },
+      { key: 'amount', label: 'Amount' },
+      { key: 'description', label: 'Description' },
+      { key: 'date', label: 'Date' },
+      { key: 'reference', label: 'Reference' },
+    ];
+    const rows = transactions.map((t) => ({
+      ...t,
+      date: new Date(t.date).toLocaleDateString(),
+    }));
+    exportToCsv('transactions', cols, rows);
+    toast.success('Exported to CSV');
+  };
 
   const columns = [
     { key: 'transactionId', label: 'TRANSACTION ID', render: (row) => <span className="font-medium text-blue-600">{row.transactionId}</span> },
@@ -49,7 +68,7 @@ const Transactions = () => {
         </span>
       ),
     },
-    { key: 'account', label: 'ACCOUNT' },
+    { key: 'account', label: 'ACCOUNT', render: (row) => row.account?.name || '-' },
     {
       key: 'actions',
       label: 'ACTIONS',
@@ -71,10 +90,6 @@ const Transactions = () => {
         onSearch={() => {}}
         actions={
           <div className="flex items-center gap-2">
-            <button className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
-              <HiOutlineFunnel className="w-4 h-4" />
-              Filter
-            </button>
             <button
               onClick={handleExport}
               className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"

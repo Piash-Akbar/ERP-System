@@ -60,7 +60,7 @@ const StaffTab = () => {
   useEffect(() => {
     api.get('/auth/users').then((res) => {
       setUsers(res.data.data || []);
-    }).catch(() => {});
+    }).catch(() => toast.error('Something went wrong'));
   }, []);
 
   const handleAdd = () => {
@@ -501,7 +501,7 @@ const LoansTab = () => {
   useEffect(() => {
     getStaff({ limit: 200 }).then((res) => {
       setStaffList(res.data.data?.data || res.data.data || []);
-    }).catch(() => {});
+    }).catch(() => toast.error('Something went wrong'));
   }, []);
 
   const handleChange = (e) => {

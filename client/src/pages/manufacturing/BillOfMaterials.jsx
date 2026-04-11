@@ -26,7 +26,7 @@ const BillOfMaterials = () => {
   const { data, pagination, loading, setPage, setSearch, refetch } = useFetch(getBOMs);
 
   useEffect(() => {
-    getProducts({ limit: 200 }).then((res) => setProducts(res.data.data?.data || res.data.data || [])).catch(() => {});
+    getProducts({ limit: 200 }).then((res) => setProducts(res.data.data?.data || res.data.data || [])).catch(() => toast.error('Something went wrong'));
   }, []);
 
   const handleStatusChange = async (id, status) => {

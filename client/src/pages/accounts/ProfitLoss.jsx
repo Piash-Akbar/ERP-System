@@ -4,7 +4,7 @@ import PageHeader from '../../components/PageHeader';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const formatCurrency = (val) =>
-  `$${(val || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  `৳${(val || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
 const monthlyData = [
   { month: 'Oct', sales: 38000, expenses: 22000, profit: 16000 },
@@ -69,7 +69,7 @@ const ProfitLoss = () => {
             <BarChart data={monthlyData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#6b7280' }} />
-              <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+              <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} tickFormatter={(v) => `৳${(v / 1000).toFixed(0)}k`} />
               <Tooltip formatter={(value) => formatCurrency(value)} />
               <Legend />
               <Bar dataKey="sales" name="Sales" fill="#3b82f6" radius={[4, 4, 0, 0]} />

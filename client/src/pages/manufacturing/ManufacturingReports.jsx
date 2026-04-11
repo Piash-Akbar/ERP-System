@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import PageHeader from '../../components/PageHeader';
 import { getManufacturingSummary } from '../../services/manufacturing.service';
 
@@ -9,7 +10,7 @@ const ManufacturingReports = () => {
   useEffect(() => {
     getManufacturingSummary()
       .then((res) => setSummary(res.data.data))
-      .catch(() => {})
+      .catch(() => toast.error('Something went wrong'))
       .finally(() => setLoading(false));
   }, []);
 

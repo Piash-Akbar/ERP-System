@@ -9,7 +9,7 @@ import FormInput from '../../components/FormInput';
 import { getExpenses, createExpense, deleteExpense } from '../../services/account.service';
 
 const formatCurrency = (val) =>
-  `$${(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  `৳${(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const categories = ['Rent', 'Utilities', 'Salaries', 'Marketing', 'Office Supplies', 'Travel', 'Other'];
 const paymentMethods = ['Bank Transfer', 'Cash', 'Credit Card', 'Check'];

@@ -49,7 +49,7 @@ const Suppliers = () => {
       label: 'DUE AMOUNT',
       render: (row) => (
         <span className={row.currentDue > 0 ? 'text-red-600 font-medium' : 'text-gray-500'}>
-          ${(row.currentDue || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          ৳{(row.currentDue || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
         </span>
       ),
     },

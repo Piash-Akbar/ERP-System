@@ -31,11 +31,23 @@ const getTransfers = asyncHandler(async (req, res) => {
   res.json({ success: true, data: result, message: 'Transfers retrieved' });
 });
 
+const getAdjustmentById = asyncHandler(async (req, res) => {
+  const result = await inventoryService.getAdjustmentById(req.params.id);
+  res.json({ success: true, data: result, message: 'Adjustment retrieved' });
+});
+
+const getTransferById = asyncHandler(async (req, res) => {
+  const result = await inventoryService.getTransferById(req.params.id);
+  res.json({ success: true, data: result, message: 'Transfer retrieved' });
+});
+
 module.exports = {
   getStockList,
   getLowStock,
   adjustStock,
   transferStock,
   getAdjustments,
+  getAdjustmentById,
   getTransfers,
+  getTransferById,
 };
