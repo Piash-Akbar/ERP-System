@@ -9,12 +9,14 @@ import PageHeader from '../../components/PageHeader';
 import StatusBadge from '../../components/StatusBadge';
 import Modal from '../../components/Modal';
 import FormInput from '../../components/FormInput';
+import api from '../../services/api';
 
 const StockAdjustment = () => {
   const { data, pagination, loading, setPage, setSearch, refetch } = useFetch(getAdjustments);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ product: '', type: 'addition', quantity: '', reason: '', note: '' });
+  const [form, setForm] = useState({ product: '', warehouse: '', type: 'addition', quantity: '', reason: '', note: '' });
   const [products, setProducts] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
 
@@ -22,6 +24,9 @@ const StockAdjustment = () => {
     if (showForm) {
       getProducts({ limit: 1000 })
         .then((res) => setProducts(res.data.data?.data || res.data.data || []))
+        .catch(() => toast.error('Something went wrong'));
+      api.get('/warehouses')
+        .then((res) => setWarehouses(res.data.data?.data || res.data.data || []))
         .catch(() => toast.error('Something went wrong'));
     }
   }, [showForm]);
@@ -48,7 +53,7 @@ const StockAdjustment = () => {
       await adjustStock({ ...form, quantity: Number(form.quantity) });
       toast.success('Stock adjusted successfully');
       setShowForm(false);
-      setForm({ product: '', type: 'addition', quantity: '', reason: '', note: '' });
+      setForm({ product: '', warehouse: '', type: 'addition', quantity: '', reason: '', note: '' });
       refetch();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to adjust stock');
@@ -75,6 +80,11 @@ const StockAdjustment = () => {
           {row.type === 'addition' ? 'Addition' : 'Subtraction'}
         </StatusBadge>
       ),
+    },
+    {
+      key: 'warehouse',
+      label: 'WAREHOUSE',
+      render: (row) => row.warehouse?.name || '-',
     },
     {
       key: 'quantity',
@@ -135,6 +145,13 @@ const StockAdjustment = () => {
               <option value="">Select Product</option>
               {products.map((p) => (
                 <option key={p._id} value={p._id}>{p.name} ({p.sku})</option>
+              ))}
+            </FormInput>
+
+            <FormInput label="Warehouse" name="warehouse" type="select" value={form.warehouse} onChange={handleChange}>
+              <option value="">All Warehouses (total stock)</option>
+              {warehouses.map((w) => (
+                <option key={w._id} value={w._id}>{w.name}</option>
               ))}
             </FormInput>
 

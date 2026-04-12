@@ -23,6 +23,7 @@ const saleItemSchema = Joi.object({
 });
 
 const createSaleSchema = Joi.object({
+  saleType: Joi.string().valid('product', 'service'),
   customer: objectId.required(),
   saleDate: Joi.date(),
   items: Joi.array().items(saleItemSchema).min(1).required(),

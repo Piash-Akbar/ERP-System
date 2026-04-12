@@ -1,101 +1,166 @@
-import { useState, useEffect } from 'react';
-import { HiOutlineFunnel, HiOutlineArrowDownTray } from 'react-icons/hi2';
+import { useState } from 'react';
+import { HiOutlineArrowDownTray } from 'react-icons/hi2';
+import { getSales, deleteSale, updateSaleStatus } from '../../services/sale.service';
+import useFetch from '../../hooks/useFetch';
+import DataTable from '../../components/DataTable';
 import PageHeader from '../../components/PageHeader';
+import StatusBadge from '../../components/StatusBadge';
+import SaleDetail from './SaleDetail';
+import ServiceSaleForm from './ServiceSaleForm';
+import { exportToCsv } from '../../utils/exportCsv';
 import toast from 'react-hot-toast';
-import { getSales, updateSaleStatus } from '../../services/sale.service';
 
+const paymentStatusColors = { paid: 'green', partial: 'yellow', pending: 'orange', unpaid: 'red' };
+const statusColors = { draft: 'gray', confirmed: 'blue', delivered: 'green', returned: 'red', cancelled: 'gray' };
 const saleStatuses = ['draft', 'confirmed', 'delivered', 'returned', 'cancelled'];
-const statusBg = {
-  confirmed: 'bg-green-50 text-green-700',
-  delivered: 'bg-blue-50 text-blue-700',
-  draft: 'bg-orange-50 text-orange-700',
-  cancelled: 'bg-red-50 text-red-700',
-  returned: 'bg-yellow-50 text-yellow-700',
-};
 
 const ServiceSale = () => {
-  const [search, setSearch] = useState('');
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [showDetail, setShowDetail] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('');
+  const { data, pagination, loading, setPage, setSearch, setParams, refetch } = useFetch(getSales, {
+    initialParams: { saleType: 'service' },
+  });
 
-  const fetchData = () => {
-    getSales({ type: 'service' })
-      .then((res) => {
-        const d = res.data?.data;
-        setData(Array.isArray(d) ? d : d?.data || d?.docs || []);
-      })
-      .catch(() => toast.error('Failed to load service sales'))
-      .finally(() => setLoading(false));
+  const handleFilter = (status) => {
+    setStatusFilter(status);
+    setParams((prev) => ({ ...prev, status: status || undefined, page: 1 }));
   };
 
-  useEffect(() => { fetchData(); }, []);
+  const handleExport = () => {
+    const exportCols = [
+      { key: 'invoiceNo', label: 'Invoice No' },
+      { key: 'customer', label: 'Customer' },
+      { key: 'saleDate', label: 'Date' },
+      { key: 'grandTotal', label: 'Amount' },
+      { key: 'paidAmount', label: 'Paid' },
+      { key: 'dueAmount', label: 'Due' },
+      { key: 'paymentStatus', label: 'Payment Status' },
+      { key: 'status', label: 'Status' },
+    ];
+    const exportData = (data || []).map((row) => ({
+      ...row,
+      customer: row.customer?.name || '',
+      saleDate: new Date(row.saleDate).toLocaleDateString(),
+    }));
+    exportToCsv('service_sales', exportCols, exportData);
+    toast.success('Exported to CSV');
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this service sale?')) return;
+    try {
+      await deleteSale(id);
+      toast.success('Sale deleted');
+      refetch();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Delete failed');
+    }
+  };
 
   const handleStatusChange = async (id, newStatus) => {
     try {
       await updateSaleStatus(id, newStatus);
-      setData((prev) => prev.map((row) => row._id === id ? { ...row, status: newStatus } : row));
       toast.success('Status updated');
-    } catch {
-      toast.error('Failed to update status');
+      refetch();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to update status');
     }
   };
 
-  const filtered = data.filter((d) => {
-    const term = search.toLowerCase();
-    return (d.customer?.name || '').toLowerCase().includes(term) || (d.invoiceNo || '').toLowerCase().includes(term);
-  });
+  const columns = [
+    {
+      key: 'invoiceNo',
+      label: 'INVOICE NO',
+      render: (row) => <span className="font-medium text-gray-900">{row.invoiceNo}</span>,
+    },
+    {
+      key: 'customer',
+      label: 'CUSTOMER',
+      render: (row) => row.customer?.name || '-',
+    },
+    {
+      key: 'saleDate',
+      label: 'DATE',
+      render: (row) => new Date(row.saleDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+    },
+    {
+      key: 'grandTotal',
+      label: 'AMOUNT',
+      render: (row) => <span className="font-medium">৳{row.grandTotal?.toLocaleString()}</span>,
+    },
+    {
+      key: 'paymentStatus',
+      label: 'PAYMENT',
+      render: (row) => {
+        const status = row.paymentStatus || 'pending';
+        return <StatusBadge color={paymentStatusColors[status]}>{status.charAt(0).toUpperCase() + status.slice(1)}</StatusBadge>;
+      },
+    },
+    {
+      key: 'status',
+      label: 'STATUS',
+      render: (row) => (
+        <select
+          value={row.status || 'confirmed'}
+          onChange={(e) => handleStatusChange(row._id, e.target.value)}
+          className={`px-2 py-1 text-xs font-medium rounded-lg border-0 cursor-pointer focus:ring-2 focus:ring-orange-400 ${
+            row.status === 'delivered' ? 'bg-green-50 text-green-700' :
+            row.status === 'confirmed' ? 'bg-blue-50 text-blue-700' :
+            row.status === 'returned' ? 'bg-red-50 text-red-700' :
+            row.status === 'cancelled' ? 'bg-gray-100 text-gray-600' :
+            'bg-orange-50 text-orange-700'
+          }`}
+        >
+          {saleStatuses.map((s) => (
+            <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+          ))}
+        </select>
+      ),
+    },
+    {
+      key: 'actions',
+      label: '',
+      render: (row) => (
+        <div className="flex items-center gap-3">
+          <button onClick={() => setShowDetail(row._id)} className="text-orange-500 hover:text-orange-700 text-xs font-medium">View</button>
+          <button onClick={() => handleDelete(row._id)} className="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div>
       <PageHeader title="Service Sale" subtitle="Manage service-based sales">
-        <button className="px-4 py-2.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600">+ New Service</button>
+        <button onClick={() => setShowForm(true)} className="px-4 py-2.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors">+ New Service</button>
       </PageHeader>
 
-      <div className="bg-white rounded-xl border border-gray-200">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search..." className="pl-3 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 w-64" />
-          <div className="flex items-center gap-2">
-            <button className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"><HiOutlineFunnel className="w-4 h-4" /> Filter</button>
-            <button className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"><HiOutlineArrowDownTray className="w-4 h-4" /> Export</button>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-4 py-3 font-medium text-gray-600">INVOICE NO</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">CUSTOMER</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">DATE</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">AMOUNT</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">STATUS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">Loading...</td></tr>
-              ) : filtered.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">No service sales found</td></tr>
-              ) : filtered.map((row) => (
-                <tr key={row._id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-900">{row.invoiceNo}</td>
-                  <td className="px-4 py-3 text-gray-700">{row.customer?.name || '-'}</td>
-                  <td className="px-4 py-3 text-gray-700">{new Date(row.saleDate).toLocaleDateString()}</td>
-                  <td className="px-4 py-3 font-medium text-gray-900">৳{row.grandTotal?.toLocaleString()}</td>
-                  <td className="px-4 py-3">
-                    <select
-                      value={row.status}
-                      onChange={(e) => handleStatusChange(row._id, e.target.value)}
-                      className={`px-2 py-1 text-xs font-medium rounded-lg border-0 cursor-pointer focus:ring-2 focus:ring-orange-400 ${statusBg[row.status] || 'bg-gray-50 text-gray-700'}`}
-                    >
-                      {saleStatuses.map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable
+        columns={columns}
+        data={data || []}
+        pagination={pagination}
+        onPageChange={setPage}
+        onSearch={setSearch}
+        loading={loading}
+        actions={
+          <>
+            <select value={statusFilter} onChange={(e) => handleFilter(e.target.value)} className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">
+              <option value="">All Status</option>
+              {saleStatuses.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+            </select>
+            <button onClick={handleExport} className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"><HiOutlineArrowDownTray className="w-4 h-4" />Export</button>
+          </>
+        }
+      />
+
+      {showDetail && <SaleDetail saleId={showDetail} onClose={() => setShowDetail(null)} onRefetch={refetch} />}
+      {showForm && (
+        <ServiceSaleForm
+          onClose={() => setShowForm(false)}
+          onSuccess={() => { setShowForm(false); refetch(); }}
+        />
+      )}
     </div>
   );
 };

@@ -66,6 +66,11 @@ const paymentSchema = new mongoose.Schema(
 
 const saleSchema = new mongoose.Schema(
   {
+    saleType: {
+      type: String,
+      enum: ['product', 'service'],
+      default: 'product',
+    },
     invoiceNo: {
       type: String,
       required: true,

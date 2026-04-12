@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { HiOutlineFunnel, HiOutlineArrowDownTray } from 'react-icons/hi2';
 import { getSales, createSaleReturn } from '../../services/sale.service';
 import useFetch from '../../hooks/useFetch';
@@ -19,10 +19,23 @@ const SaleReturn = () => {
     reason: '',
   });
   const [submitting, setSubmitting] = useState(false);
+  const [salesList, setSalesList] = useState([]);
+
+  // Fetch available (non-returned) sales for the dropdown
+  useEffect(() => {
+    if (showForm) {
+      getSales({ page: 1, limit: 100, isReturn: false })
+        .then((res) => {
+          const sales = res.data?.data?.data || [];
+          setSalesList(sales.filter((s) => s.status !== 'returned' && s.status !== 'cancelled'));
+        })
+        .catch(() => setSalesList([]));
+    }
+  }, [showForm]);
 
   // For the return list, we fetch sales that have returns or use a custom endpoint
   const { data, pagination, loading, setPage, setSearch, refetch } = useFetch(getSales, {
-    initialParams: { page: 1, limit: 20, search: '', type: 'return' },
+    initialParams: { page: 1, limit: 20, search: '', isReturn: true },
   });
 
   const handleExport = () => {
@@ -145,12 +158,30 @@ const SaleReturn = () => {
           <form onSubmit={handleSubmitReturn} className="space-y-4">
             <FormInput
               label="Invoice / Sale ID"
-              type="text"
+              type="select"
               value={returnForm.saleId}
-              onChange={(e) => setReturnForm({ ...returnForm, saleId: e.target.value })}
-              placeholder="Enter Sale ID"
+              onChange={(e) => {
+                const sale = salesList.find((s) => s._id === e.target.value);
+                setReturnForm({
+                  ...returnForm,
+                  saleId: e.target.value,
+                  invoiceNo: sale?.invoiceNo || '',
+                  customer: sale?.customer?.name || '',
+                  amount: sale?.grandTotal || 0,
+                });
+              }}
               required
-            />
+            >
+              <option value="">Select Invoice</option>
+              {salesList.map((sale) => (
+                <option key={sale._id} value={sale._id}>
+                  {sale.invoiceNo} — {sale.customer?.name || 'N/A'} (৳{(sale.grandTotal || 0).toLocaleString()})
+                </option>
+              ))}
+            </FormInput>
+            {returnForm.customer && (
+              <FormInput label="Customer" type="text" value={returnForm.customer} disabled />
+            )}
             <FormInput
               label="Return Date"
               type="date"

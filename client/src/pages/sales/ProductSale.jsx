@@ -6,14 +6,16 @@ import FormInput from '../../components/FormInput';
 import { getContacts } from '../../services/contact.service';
 import { getProducts } from '../../services/product.service';
 import { createSale } from '../../services/sale.service';
+import ContactForm from '../contacts/ContactForm';
 
-const emptyItem = { product: '', name: '', quantity: 1, unitPrice: 0 };
+const emptyItem = { product: '', name: '', quantity: 1, unitPrice: 0, purchasePrice: 0 };
 
 const ProductSale = () => {
   const navigate = useNavigate();
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
   const [form, setForm] = useState({
     customer: '',
     date: new Date().toISOString().split('T')[0],
@@ -24,13 +26,22 @@ const ProductSale = () => {
     previousDues: 0,
   });
 
-  useEffect(() => {
-    getContacts({ type: 'customer', limit: 500 })
+  const loadCustomers = (selectLatest = false) => {
+    return getContacts({ type: 'customer', limit: 500 })
       .then((res) => {
         const d = res.data?.data;
-        setCustomers(Array.isArray(d) ? d : d?.data || d?.docs || []);
+        const list = Array.isArray(d) ? d : d?.data || d?.docs || [];
+        setCustomers(list);
+        if (selectLatest && list.length) {
+          const newest = [...list].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+          setForm((prev) => ({ ...prev, customer: newest._id }));
+        }
       })
       .catch(() => toast.error('Failed to load customers'));
+  };
+
+  useEffect(() => {
+    loadCustomers();
     getProducts({ limit: 500 })
       .then((res) => {
         const d = res.data?.data;
@@ -49,6 +60,8 @@ const ProductSale = () => {
       if (prod) {
         items[index].name = prod.name;
         items[index].unitPrice = prod.sellingPrice || 0;
+        items[index].purchasePrice = prod.purchasePrice || 0;
+        // console.log(prod);
       }
     }
 
@@ -76,6 +89,7 @@ const ProductSale = () => {
           name: item.name,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
+          
           subtotal: item.quantity * item.unitPrice,
         })),
         subtotal,
@@ -112,6 +126,7 @@ const ProductSale = () => {
             </FormInput>
             <FormInput label="Date" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
           </div>
+            <button type="button" onClick={() => setShowContactModal(true)} className="self-end text-sm text-blue-600 hover:text-blue-800">+ Add Customer</button>
         </div>
 
         {/* Products */}
@@ -128,6 +143,7 @@ const ProductSale = () => {
                   <th className="text-left py-2 font-medium text-gray-600 w-20">Qty</th>
                   <th className="text-left py-2 font-medium text-gray-600 w-28">Price</th>
                   <th className="text-left py-2 font-medium text-gray-600 w-28">Total</th>
+                  <th className="text-left py-2 font-medium text-gray-600 w-28">Purchase Price</th>
                   <th className="w-10"></th>
                 </tr>
               </thead>
@@ -145,6 +161,7 @@ const ProductSale = () => {
                     <td className="py-2 pr-2"><input type="number" min={1} value={item.quantity} onChange={(e) => updateItem(i, 'quantity', Number(e.target.value))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" /></td>
                     <td className="py-2 pr-2"><input type="number" min={0} value={item.unitPrice} onChange={(e) => updateItem(i, 'unitPrice', Number(e.target.value))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" /></td>
                     <td className="py-2 pr-2 font-medium text-gray-900">৳{(item.quantity * item.unitPrice).toFixed(2)}</td>
+                    <td className='py-2 pr-2 font-medium text-gray-900'>৳{(item.purchasePrice)}</td>
                     <td className="py-2">{form.items.length > 1 && <button type="button" onClick={() => removeItem(i)} className="text-red-500 hover:text-red-700 text-xs">Remove</button>}</td>
                   </tr>
                 ))}
@@ -158,7 +175,7 @@ const ProductSale = () => {
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h3 className="text-base font-semibold text-gray-900 mb-4">Additional Charges</h3>
             <div className="space-y-3">
-              <FormInput label="TAX" type="number" value={form.tax} min={0} onChange={(e) => setForm({ ...form, tax: Number(e.target.value) })} />
+              <FormInput label="TAX (%)" type="number" value={form.tax} min={0} onChange={(e) => setForm({ ...form, tax: Number(e.target.value) })} />
               <FormInput label="Shipping Charge" type="number" value={form.shippingCharge} min={0} onChange={(e) => setForm({ ...form, shippingCharge: Number(e.target.value) })} />
               <FormInput label="Other Charges" type="number" value={form.otherCharges} min={0} onChange={(e) => setForm({ ...form, otherCharges: Number(e.target.value) })} />
               <FormInput label="Previous Dues" type="number" value={form.previousDues} min={0} onChange={(e) => setForm({ ...form, previousDues: Number(e.target.value) })} />
@@ -187,6 +204,12 @@ const ProductSale = () => {
           </button>
         </div>
       </form>
+
+      <ContactForm
+        isOpen={showContactModal}
+        onClose={() => setShowContactModal(false)}
+        onSuccess={() => loadCustomers(true)}
+      />
     </div>
   );
 };

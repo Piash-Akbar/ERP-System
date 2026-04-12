@@ -10,6 +10,8 @@ const typeColors = {
   sale: 'blue',
   purchase: 'green',
   transfer: 'purple',
+  adjustment: 'orange',
+  opening: 'gray',
 };
 
 const ProductMovement = () => {

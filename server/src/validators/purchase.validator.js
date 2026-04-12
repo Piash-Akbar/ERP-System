@@ -54,8 +54,20 @@ const updatePurchaseStatusSchema = Joi.object({
   status: Joi.string().valid('ordered', 'received', 'partial', 'returned', 'cancelled').required(),
 });
 
+const returnItemSchema = Joi.object({
+  itemId: objectId.required(),
+  variantId: objectId.allow(null),
+  quantity: Joi.number().min(1).required(),
+});
+
+const createReturnSchema = Joi.object({
+  items: Joi.array().items(returnItemSchema).min(1).required(),
+  note: Joi.string().trim().allow(''),
+});
+
 module.exports = {
   createPurchaseSchema,
   addPaymentSchema,
   updatePurchaseStatusSchema,
+  createReturnSchema,
 };

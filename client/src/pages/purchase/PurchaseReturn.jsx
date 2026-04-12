@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { getPurchases } from '../../services/purchase.service';
+import { useState, useEffect } from 'react';
+import { getPurchases, getPurchase, createPurchaseReturn } from '../../services/purchase.service';
 import useFetch from '../../hooks/useFetch';
 import DataTable from '../../components/DataTable';
 import PageHeader from '../../components/PageHeader';
@@ -100,18 +100,39 @@ const PurchaseReturn = () => {
 };
 
 const NewReturnModal = ({ onClose, onSuccess }) => {
-  const [form, setForm] = useState({
-    poNumber: '',
-    reason: 'Quality Issue',
-    note: '',
-  });
+  const [purchases, setPurchases] = useState([]);
+  const [purchaseId, setPurchaseId] = useState('');
+  const [purchase, setPurchase] = useState(null);
+  const [returnQtys, setReturnQtys] = useState({});
+  const [reason, setReason] = useState('Quality Issue');
+  const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    getPurchases({ isReturn: 'false', limit: 200 }).then((res) => {
+      setPurchases(res.data.data?.data || []);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!purchaseId) { setPurchase(null); return; }
+    getPurchase(purchaseId).then((res) => {
+      setPurchase(res.data.data);
+      setReturnQtys({});
+    });
+  }, [purchaseId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.poNumber) return toast.error('Enter a PO number');
+    if (!purchaseId) return toast.error('Select a purchase');
+    const items = Object.entries(returnQtys)
+      .filter(([, qty]) => Number(qty) > 0)
+      .map(([itemId, qty]) => ({ itemId, quantity: Number(qty) }));
+    if (items.length === 0) return toast.error('Enter quantity for at least one item');
+
     setLoading(true);
     try {
+      await createPurchaseReturn(purchaseId, { items, note: note ? `${reason}: ${note}` : reason });
       toast.success('Return created successfully');
       onSuccess();
     } catch (err) {
@@ -122,21 +143,59 @@ const NewReturnModal = ({ onClose, onSuccess }) => {
   };
 
   return (
-    <Modal isOpen onClose={onClose} title="New Purchase Return" size="md">
+    <Modal isOpen onClose={onClose} title="New Purchase Return" size="lg">
       <form onSubmit={handleSubmit} className="space-y-4">
         <FormInput
-          label="PO Number"
-          value={form.poNumber}
-          onChange={(e) => setForm({ ...form, poNumber: e.target.value })}
-          placeholder="Enter PO number"
-          required
-        />
-        <FormInput
-          label="Reason"
+          label="Purchase Order"
           type="select"
-          value={form.reason}
-          onChange={(e) => setForm({ ...form, reason: e.target.value })}
+          value={purchaseId}
+          onChange={(e) => setPurchaseId(e.target.value)}
+          required
         >
+          <option value="">Select Purchase Order</option>
+          {purchases.map((p) => (
+            <option key={p._id} value={p._id}>
+              {p.referenceNo} — {p.supplier?.name || 'Supplier'} (৳{p.grandTotal?.toLocaleString()})
+            </option>
+          ))}
+        </FormInput>
+
+        {purchase && (
+          <div>
+            <h4 className="text-sm font-medium text-gray-700 mb-2">Items</h4>
+            <table className="w-full text-sm border">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="text-left px-3 py-2">Product</th>
+                  <th className="px-3 py-2">Purchased</th>
+                  <th className="px-3 py-2">Unit Price</th>
+                  <th className="px-3 py-2">Return Qty</th>
+                </tr>
+              </thead>
+              <tbody>
+                {purchase.items?.map((item) => (
+                  <tr key={item._id} className="border-t">
+                    <td className="px-3 py-2">{item.name || item.product?.name}</td>
+                    <td className="px-3 py-2 text-center">{item.quantity}</td>
+                    <td className="px-3 py-2 text-center">৳{item.unitPrice}</td>
+                    <td className="px-3 py-2 text-center">
+                      <input
+                        type="number"
+                        min={0}
+                        max={item.quantity}
+                        value={returnQtys[item._id] || ''}
+                        onChange={(e) => setReturnQtys({ ...returnQtys, [item._id]: e.target.value })}
+                        className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <FormInput label="Reason" type="select" value={reason} onChange={(e) => setReason(e.target.value)}>
           <option value="Quality Issue">Quality Issue</option>
           <option value="Wrong Specification">Wrong Specification</option>
           <option value="Damaged Goods">Damaged Goods</option>
@@ -145,10 +204,11 @@ const NewReturnModal = ({ onClose, onSuccess }) => {
         <FormInput
           label="Note"
           type="textarea"
-          value={form.note}
-          onChange={(e) => setForm({ ...form, note: e.target.value })}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
           placeholder="Additional details..."
         />
+
         <div className="flex justify-end gap-3 pt-2">
           <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">
             Cancel

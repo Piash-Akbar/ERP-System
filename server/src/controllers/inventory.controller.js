@@ -41,6 +41,21 @@ const getTransferById = asyncHandler(async (req, res) => {
   res.json({ success: true, data: result, message: 'Transfer retrieved' });
 });
 
+const getMovements = asyncHandler(async (req, res) => {
+  const result = await inventoryService.getMovements(req.query);
+  res.json({ success: true, data: result, message: 'Movements retrieved' });
+});
+
+const getOpeningStock = asyncHandler(async (req, res) => {
+  const result = await inventoryService.getOpeningStock(req.query);
+  res.json({ success: true, data: result, message: 'Opening stock retrieved' });
+});
+
+const addOpeningStock = asyncHandler(async (req, res) => {
+  const result = await inventoryService.addOpeningStock(req.body, req.user._id);
+  res.status(201).json({ success: true, data: result, message: 'Opening stock added successfully' });
+});
+
 module.exports = {
   getStockList,
   getLowStock,
@@ -50,4 +65,7 @@ module.exports = {
   getAdjustmentById,
   getTransfers,
   getTransferById,
+  getMovements,
+  getOpeningStock,
+  addOpeningStock,
 };

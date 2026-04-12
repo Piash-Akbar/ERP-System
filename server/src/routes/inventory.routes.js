@@ -5,7 +5,7 @@ const { protect } = require('../middlewares/auth');
 const { authorize } = require('../middlewares/authorize');
 const { logActivity } = require('../middlewares/activityLogger');
 const { validate } = require('../middlewares/validate');
-const { adjustStockSchema, transferStockSchema } = require('../validators/inventory.validator');
+const { adjustStockSchema, transferStockSchema, openingStockSchema } = require('../validators/inventory.validator');
 
 router.use(protect);
 
@@ -17,5 +17,8 @@ router.get('/adjustments', authorize('inventory', 'view'), inventoryController.g
 router.get('/adjustments/:id', authorize('inventory', 'view'), inventoryController.getAdjustmentById);
 router.get('/transfers', authorize('inventory', 'view'), inventoryController.getTransfers);
 router.get('/transfers/:id', authorize('inventory', 'view'), inventoryController.getTransferById);
+router.get('/movements', authorize('inventory', 'view'), inventoryController.getMovements);
+router.get('/opening-stock', authorize('inventory', 'view'), inventoryController.getOpeningStock);
+router.post('/opening-stock', authorize('inventory', 'create'), validate(openingStockSchema), logActivity('inventory', 'Added opening stock'), inventoryController.addOpeningStock);
 
 module.exports = router;

@@ -18,6 +18,10 @@ const ProductionPlanning = () => {
   const [products, setProducts] = useState([]);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ product: '', quantity: '', startDate: '', endDate: '', resources: '', materialStatus: 'available', notes: '' });
+  const [progressModal, setProgressModal] = useState({ open: false, plan: null });
+  const [progressForm, setProgressForm] = useState({ progress: 0, status: 'scheduled', materialStatus: 'available', notes: '' });
+  const [savingProgress, setSavingProgress] = useState(false);
+  const [viewModal, setViewModal] = useState({ open: false, plan: null });
 
   const { data, pagination, loading, setPage, setSearch, refetch } = useFetch(getPlans);
 
@@ -32,6 +36,35 @@ const ProductionPlanning = () => {
       toast.success('Status updated');
       refetch();
     } catch (err) { toast.error(err.response?.data?.error || 'Failed'); }
+  };
+
+  const openProgress = (plan) => {
+    setProgressForm({
+      progress: plan.progress || 0,
+      status: plan.status || 'scheduled',
+      materialStatus: plan.materialStatus || 'available',
+      notes: plan.notes || '',
+    });
+    setProgressModal({ open: true, plan });
+  };
+
+  const handleProgressSubmit = async (e) => {
+    e.preventDefault();
+    setSavingProgress(true);
+    try {
+      const payload = {
+        progress: Number(progressForm.progress),
+        status: progressForm.status,
+        materialStatus: progressForm.materialStatus,
+        notes: progressForm.notes,
+      };
+      if (payload.progress >= 100) payload.status = 'completed';
+      await updatePlan(progressModal.plan._id, payload);
+      toast.success('Progress updated');
+      setProgressModal({ open: false, plan: null });
+      refetch();
+    } catch (err) { toast.error(err.response?.data?.error || 'Failed'); }
+    finally { setSavingProgress(false); }
   };
 
   const handleDelete = async (id) => {
@@ -109,7 +142,11 @@ const ProductionPlanning = () => {
                     </select>
                   </td>
                   <td className="px-4 py-3">
-                    <button onClick={() => handleDelete(p._id)} className="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => setViewModal({ open: true, plan: p })} className="text-gray-700 hover:text-gray-900 text-xs font-medium">View</button>
+                      <button onClick={() => openProgress(p)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">Update</button>
+                      <button onClick={() => handleDelete(p._id)} className="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -136,6 +173,74 @@ const ProductionPlanning = () => {
             <button type="submit" disabled={saving} className="px-4 py-2.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50">{saving ? 'Creating...' : 'Create Plan'}</button>
           </div>
         </form>
+      </Modal>
+
+      <Modal isOpen={progressModal.open} onClose={() => setProgressModal({ open: false, plan: null })} title={`Update Progress — ${progressModal.plan?.planCode || ''}`} size="md">
+        <form onSubmit={handleProgressSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Progress ({progressForm.progress}%)</label>
+            <input type="range" min="0" max="100" step="1" value={progressForm.progress}
+              onChange={(e) => setProgressForm({ ...progressForm, progress: e.target.value })}
+              className="w-full accent-orange-500" />
+            <div className="flex items-center gap-2 mt-2">
+              <input type="number" min="0" max="100" value={progressForm.progress}
+                onChange={(e) => setProgressForm({ ...progressForm, progress: e.target.value })}
+                className="w-24 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400" />
+              <div className="flex-1 bg-gray-200 rounded-full h-2">
+                <div className="bg-orange-500 h-2 rounded-full transition-all" style={{ width: `${progressForm.progress}%` }}></div>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <FormInput label="Status" type="select" value={progressForm.status} onChange={(e) => setProgressForm({ ...progressForm, status: e.target.value })}>
+              {planStatuses.map((s) => <option key={s} value={s}>{s.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}</option>)}
+            </FormInput>
+            <FormInput label="Material Status" type="select" value={progressForm.materialStatus} onChange={(e) => setProgressForm({ ...progressForm, materialStatus: e.target.value })}>
+              <option value="available">Available</option>
+              <option value="partial">Partial</option>
+              <option value="shortage">Shortage</option>
+            </FormInput>
+          </div>
+          <FormInput label="Notes" type="textarea" value={progressForm.notes} onChange={(e) => setProgressForm({ ...progressForm, notes: e.target.value })} />
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+            <button type="button" onClick={() => setProgressModal({ open: false, plan: null })} className="px-4 py-2.5 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+            <button type="submit" disabled={savingProgress} className="px-4 py-2.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50">{savingProgress ? 'Saving...' : 'Save Progress'}</button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal isOpen={viewModal.open} onClose={() => setViewModal({ open: false, plan: null })} title={`Plan Details — ${viewModal.plan?.planCode || ''}`} size="lg">
+        {viewModal.plan && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div><p className="text-xs text-gray-500">Plan Code</p><p className="font-medium text-gray-900">{viewModal.plan.planCode}</p></div>
+              <div><p className="text-xs text-gray-500">Product</p><p className="font-medium text-gray-900">{viewModal.plan.product?.name || '-'} {viewModal.plan.product?.sku && <span className="text-gray-500">({viewModal.plan.product.sku})</span>}</p></div>
+              <div><p className="text-xs text-gray-500">Quantity</p><p className="font-medium text-gray-900">{viewModal.plan.quantity}</p></div>
+              <div><p className="text-xs text-gray-500">Status</p><span className={`inline-block px-2 py-1 text-xs font-medium rounded-lg ${statusBg[viewModal.plan.status] || 'bg-gray-50 text-gray-700'}`}>{viewModal.plan.status?.replace('_', ' ')}</span></div>
+              <div><p className="text-xs text-gray-500">Start Date</p><p className="font-medium text-gray-900">{new Date(viewModal.plan.startDate).toLocaleDateString()}</p></div>
+              <div><p className="text-xs text-gray-500">End Date</p><p className="font-medium text-gray-900">{new Date(viewModal.plan.endDate).toLocaleDateString()}</p></div>
+              <div><p className="text-xs text-gray-500">Material Status</p><StatusBadge color={materialStatusColors[viewModal.plan.materialStatus]}>{viewModal.plan.materialStatus}</StatusBadge></div>
+              <div><p className="text-xs text-gray-500">Created By</p><p className="font-medium text-gray-900">{viewModal.plan.createdBy?.name || '-'}</p></div>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Progress</p>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 bg-gray-200 rounded-full h-2"><div className="bg-orange-500 h-2 rounded-full" style={{ width: `${viewModal.plan.progress || 0}%` }}></div></div>
+                <span className="text-sm font-medium text-gray-700">{viewModal.plan.progress || 0}%</span>
+              </div>
+            </div>
+            {viewModal.plan.resources && <div><p className="text-xs text-gray-500 mb-1">Resources</p><p className="text-sm text-gray-800 whitespace-pre-wrap">{viewModal.plan.resources}</p></div>}
+            {viewModal.plan.notes && <div><p className="text-xs text-gray-500 mb-1">Notes</p><p className="text-sm text-gray-800 whitespace-pre-wrap">{viewModal.plan.notes}</p></div>}
+            <div className="grid grid-cols-2 gap-4 text-xs text-gray-500 pt-3 border-t border-gray-200">
+              <div>Created: {viewModal.plan.createdAt ? new Date(viewModal.plan.createdAt).toLocaleString() : '-'}</div>
+              <div>Updated: {viewModal.plan.updatedAt ? new Date(viewModal.plan.updatedAt).toLocaleString() : '-'}</div>
+            </div>
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+              <button type="button" onClick={() => setViewModal({ open: false, plan: null })} className="px-4 py-2.5 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">Close</button>
+              <button type="button" onClick={() => { const plan = viewModal.plan; setViewModal({ open: false, plan: null }); openProgress(plan); }} className="px-4 py-2.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600">Update Progress</button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

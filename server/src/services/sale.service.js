@@ -16,6 +16,7 @@ const generateInvoiceNo = async () => {
 
 const getAll = async (query) => {
   const filter = { isDeleted: false };
+  if (query.saleType) filter.saleType = query.saleType;
   if (query.status) filter.status = query.status;
   if (query.paymentStatus) filter.paymentStatus = query.paymentStatus;
   if (query.customer) filter.customer = query.customer;
@@ -210,21 +211,43 @@ const addPayment = async (saleId, payment) => {
   return sale;
 };
 
-const createReturn = async (saleId, returnItems, userId) => {
+const createReturn = async (saleId, body, userId) => {
   const original = await Sale.findById(saleId).populate('items.product');
   if (!original) throw new ApiError('Original sale not found', 404);
+  if (original.status === 'returned') throw new ApiError('This sale has already been returned', 400);
 
   const returnInvoice = `RET-${original.invoiceNo}`;
+  const returnItems = body.items;
 
-  let returnTotal = 0;
-  for (const ri of returnItems) {
-    const origItem = original.items.id(ri.itemId);
-    if (!origItem) throw new ApiError('Sale item not found', 404);
-    ri.subtotal = ri.quantity * origItem.unitPrice;
-    returnTotal += ri.subtotal;
+  // If items array is provided, do item-level return; otherwise full return
+  let itemsToReturn;
+  let returnTotal;
 
-    // Restore stock
-    const product = await Product.findById(origItem.product);
+  if (returnItems && returnItems.length > 0) {
+    returnTotal = 0;
+    itemsToReturn = [];
+    for (const ri of returnItems) {
+      const origItem = original.items.id(ri.itemId);
+      if (!origItem) throw new ApiError('Sale item not found', 404);
+      const subtotal = ri.quantity * origItem.unitPrice;
+      returnTotal += subtotal;
+      itemsToReturn.push({ origItem, quantity: ri.quantity, subtotal, variantId: ri.variantId });
+    }
+  } else {
+    // Full return — return all items from the original sale
+    returnTotal = body.amount || original.grandTotal;
+    itemsToReturn = original.items.map((origItem) => ({
+      origItem,
+      quantity: origItem.quantity,
+      subtotal: origItem.subtotal,
+      variantId: origItem.variantId,
+    }));
+  }
+
+  // Restore stock for returned items
+  for (const ri of itemsToReturn) {
+    const product = await Product.findById(ri.origItem.product._id || ri.origItem.product);
+    if (!product) continue;
     if (ri.variantId) {
       const variant = product.variants.id(ri.variantId);
       if (variant) variant.stock += ri.quantity;
@@ -237,19 +260,16 @@ const createReturn = async (saleId, returnItems, userId) => {
   const returnSale = await Sale.create({
     invoiceNo: returnInvoice,
     customer: original.customer,
-    saleDate: new Date(),
-    items: returnItems.map((ri) => {
-      const origItem = original.items.id(ri.itemId);
-      return {
-        product: origItem.product,
-        variantId: origItem.variantId,
-        name: origItem.name,
-        sku: origItem.sku,
-        quantity: ri.quantity,
-        unitPrice: origItem.unitPrice,
-        subtotal: ri.subtotal,
-      };
-    }),
+    saleDate: body.date ? new Date(body.date) : new Date(),
+    items: itemsToReturn.map((ri) => ({
+      product: ri.origItem.product._id || ri.origItem.product,
+      variantId: ri.origItem.variantId,
+      name: ri.origItem.name,
+      sku: ri.origItem.sku,
+      quantity: ri.quantity,
+      unitPrice: ri.origItem.unitPrice,
+      subtotal: ri.subtotal,
+    })),
     subtotal: returnTotal,
     grandTotal: returnTotal,
     paidAmount: 0,
@@ -258,6 +278,8 @@ const createReturn = async (saleId, returnItems, userId) => {
     paymentStatus: 'paid',
     isReturn: true,
     returnRef: saleId,
+    returnReason: body.reason || '',
+    note: body.reason ? `Return reason: ${body.reason}` : '',
     createdBy: userId,
   });
 

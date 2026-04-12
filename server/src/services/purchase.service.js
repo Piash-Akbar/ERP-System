@@ -136,7 +136,7 @@ const addPayment = async (purchaseId, payment) => {
   return purchase;
 };
 
-const createReturn = async (purchaseId, returnItems, userId) => {
+const createReturn = async (purchaseId, returnItems, userId, note) => {
   const original = await Purchase.findById(purchaseId);
   if (!original) throw new ApiError('Original purchase not found', 404);
 
@@ -182,6 +182,7 @@ const createReturn = async (purchaseId, returnItems, userId) => {
     paymentStatus: 'paid',
     isReturn: true,
     returnRef: purchaseId,
+    note,
     createdBy: userId,
   });
 

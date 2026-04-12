@@ -99,6 +99,10 @@ const getPlanById = async (id) => {
 };
 
 const createPlan = async (data) => {
+  if (!data.planCode) {
+    const count = await ProductionPlan.countDocuments({});
+    data.planCode = `PP-${String(count + 1).padStart(3, '0')}`;
+  }
   const plan = await ProductionPlan.create(data);
   return plan.populate([
     { path: 'product', select: 'name sku' },

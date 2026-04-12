@@ -58,7 +58,7 @@ const updateWorkCenterSchema = createWorkCenterSchema.fork(['name', 'capacity'],
 
 // ─── Production Plan ─────────────────────────────────────
 const createPlanSchema = Joi.object({
-  planCode: Joi.string().trim().required(),
+  planCode: Joi.string().trim(),
   product: objectId.allow('', null),
   quantity: Joi.number().min(1).required(),
   startDate: Joi.date().required(),

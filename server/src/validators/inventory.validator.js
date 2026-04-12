@@ -22,7 +22,18 @@ const transferStockSchema = Joi.object({
   note: Joi.string().trim().allow(''),
 });
 
+const openingStockSchema = Joi.object({
+  product: objectId.required(),
+  variantId: objectId.allow('', null),
+  warehouse: objectId.required(),
+  quantity: Joi.number().min(1).required(),
+  value: Joi.number().min(0).allow(null),
+  date: Joi.date().required(),
+  note: Joi.string().trim().allow(''),
+});
+
 module.exports = {
   adjustStockSchema,
   transferStockSchema,
+  openingStockSchema,
 };

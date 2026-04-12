@@ -1,6 +1,7 @@
 const Product = require('../models/Product');
 const StockAdjustment = require('../models/StockAdjustment');
 const StockTransfer = require('../models/StockTransfer');
+const OpeningStock = require('../models/OpeningStock');
 const ApiError = require('../utils/apiError');
 const { paginate } = require('../utils/pagination');
 
@@ -73,6 +74,21 @@ const adjustStock = async (data, userId) => {
       product.stock += data.quantity;
     } else {
       product.stock -= data.quantity;
+    }
+
+    if (data.warehouse) {
+      const entry = product.warehouseStock.find(
+        (ws) => String(ws.warehouse) === String(data.warehouse)
+      );
+      if (data.type === 'addition') {
+        if (entry) entry.quantity += data.quantity;
+        else product.warehouseStock.push({ warehouse: data.warehouse, quantity: data.quantity });
+      } else {
+        if (!entry || entry.quantity < data.quantity) {
+          throw new ApiError('Insufficient stock in this warehouse', 400);
+        }
+        entry.quantity -= data.quantity;
+      }
     }
   }
 
@@ -149,26 +165,65 @@ const getMovements = async (query) => {
   const limit = parseInt(query.limit) || 20;
   const skip = (page - 1) * limit;
 
-  const adjustmentPopulate = [
-    { path: 'product', select: 'name sku' },
-    { path: 'adjustedBy', select: 'name email' },
-  ];
+  const productFilter = {};
+  if (query.search) {
+    const regex = new RegExp(query.search, 'i');
+    const matched = await Product.find({
+      isDeleted: false,
+      $or: [{ name: regex }, { sku: regex }],
+    }).select('_id');
+    productFilter.product = { $in: matched.map((p) => p._id) };
+  }
+  if (query.product) productFilter.product = query.product;
 
-  const transferPopulate = [
-    { path: 'product', select: 'name sku' },
-    { path: 'transferredBy', select: 'name email' },
-    { path: 'fromWarehouse', select: 'name' },
-    { path: 'toWarehouse', select: 'name' },
-  ];
-
-  const [adjustments, transfers] = await Promise.all([
-    StockAdjustment.find().populate(adjustmentPopulate).lean(),
-    StockTransfer.find().populate(transferPopulate).lean(),
+  const [adjustments, transfers, openings] = await Promise.all([
+    StockAdjustment.find(productFilter)
+      .populate('product', 'name sku')
+      .populate('warehouse', 'name')
+      .lean(),
+    StockTransfer.find(productFilter)
+      .populate('product', 'name sku')
+      .populate('fromWarehouse', 'name')
+      .populate('toWarehouse', 'name')
+      .lean(),
+    OpeningStock.find(productFilter)
+      .populate('product', 'name sku')
+      .populate('warehouse', 'name')
+      .lean(),
   ]);
 
   const movements = [
-    ...adjustments.map((a) => ({ ...a, movementType: 'adjustment' })),
-    ...transfers.map((t) => ({ ...t, movementType: 'transfer' })),
+    ...adjustments.map((a) => ({
+      _id: a._id,
+      product: a.product,
+      type: 'adjustment',
+      subType: a.type,
+      quantity: a.quantity,
+      source: a.type === 'subtraction' ? a.warehouse : null,
+      destination: a.type === 'addition' ? a.warehouse : null,
+      date: a.createdAt,
+      createdAt: a.createdAt,
+    })),
+    ...transfers.map((t) => ({
+      _id: t._id,
+      product: t.product,
+      type: 'transfer',
+      quantity: t.quantity,
+      source: t.fromWarehouse,
+      destination: t.toWarehouse,
+      date: t.createdAt,
+      createdAt: t.createdAt,
+    })),
+    ...openings.map((o) => ({
+      _id: o._id,
+      product: o.product,
+      type: 'opening',
+      quantity: o.quantity,
+      source: null,
+      destination: o.warehouse,
+      date: o.date || o.createdAt,
+      createdAt: o.createdAt,
+    })),
   ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   const total = movements.length;
@@ -244,6 +299,71 @@ const getTransferById = async (id) => {
   return transfer;
 };
 
+const getOpeningStock = async (query) => {
+  const filter = {};
+  if (query.product) filter.product = query.product;
+  if (query.warehouse) filter.warehouse = query.warehouse;
+
+  if (query.search) {
+    const regex = new RegExp(query.search, 'i');
+    const matchedProducts = await Product.find({
+      isDeleted: false,
+      $or: [{ name: regex }, { sku: regex }],
+    }).select('_id');
+    filter.product = { $in: matchedProducts.map((p) => p._id) };
+  }
+
+  const result = await paginate(OpeningStock, filter, {
+    page: query.page,
+    limit: query.limit,
+    sort: query.sort || { createdAt: -1 },
+    populate: [
+      { path: 'product', select: 'name sku' },
+      { path: 'warehouse', select: 'name' },
+      { path: 'createdBy', select: 'name email' },
+    ],
+  });
+
+  return result;
+};
+
+const addOpeningStock = async (data, userId) => {
+  const product = await Product.findOne({ _id: data.product, isDeleted: false });
+  if (!product) {
+    throw new ApiError('Product not found', 404);
+  }
+
+  const quantity = Number(data.quantity);
+
+  // Update total stock
+  product.stock = (product.stock || 0) + quantity;
+
+  // Update warehouse-level stock
+  const entry = product.warehouseStock.find(
+    (ws) => String(ws.warehouse) === String(data.warehouse)
+  );
+  if (entry) {
+    entry.quantity += quantity;
+  } else {
+    product.warehouseStock.push({ warehouse: data.warehouse, quantity });
+  }
+
+  await product.save();
+
+  const opening = await OpeningStock.create({
+    product: data.product,
+    variantId: data.variantId || undefined,
+    warehouse: data.warehouse,
+    quantity,
+    value: Number(data.value) || 0,
+    date: data.date,
+    note: data.note,
+    createdBy: userId,
+  });
+
+  return opening;
+};
+
 module.exports = {
   getStockList,
   getLowStock,
@@ -254,4 +374,6 @@ module.exports = {
   getAdjustmentById,
   getTransfers,
   getTransferById,
+  getOpeningStock,
+  addOpeningStock,
 };

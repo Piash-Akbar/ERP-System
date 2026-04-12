@@ -45,7 +45,7 @@ exports.addPayment = asyncHandler(async (req, res) => {
 });
 
 exports.createReturn = asyncHandler(async (req, res) => {
-  const returnPurchase = await purchaseService.createReturn(req.params.id, req.body.items, req.user._id);
+  const returnPurchase = await purchaseService.createReturn(req.params.id, req.body.items, req.user._id, req.body.note);
   res.status(201).json({ success: true, data: returnPurchase, message: 'Return created' });
 });
 

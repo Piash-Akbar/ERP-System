@@ -22,7 +22,7 @@ exports.addPayment = asyncHandler(async (req, res) => {
 });
 
 exports.createReturn = asyncHandler(async (req, res) => {
-  const returnSale = await saleService.createReturn(req.params.id, req.body.items, req.user._id);
+  const returnSale = await saleService.createReturn(req.params.id, req.body, req.user._id);
   res.status(201).json({ success: true, data: returnSale, message: 'Return created' });
 });
 
