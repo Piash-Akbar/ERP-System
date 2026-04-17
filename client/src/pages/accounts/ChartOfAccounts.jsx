@@ -1,14 +1,21 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
-import { HiOutlinePlus, HiOutlinePencilSquare, HiOutlineTrash, HiOutlineFunnel, HiOutlineArrowDownTray } from 'react-icons/hi2';
+import { HiOutlinePlus, HiOutlineTrash, HiOutlineFunnel, HiOutlineArrowDownTray } from 'react-icons/hi2';
 import PageHeader from '../../components/PageHeader';
 import DataTable from '../../components/DataTable';
 import StatusBadge from '../../components/StatusBadge';
 import Modal from '../../components/Modal';
 import FormInput from '../../components/FormInput';
+import {
+  getChartOfAccounts,
+  createChartAccount,
+  deleteChartAccount,
+} from '../../services/account.service';
 
 const formatCurrency = (val) =>
-  val ? `৳${val.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '-';
+  val || val === 0
+    ? `৳${Number(val).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+    : '-';
 
 const typeColors = {
   Assets: 'blue',
@@ -18,41 +25,77 @@ const typeColors = {
   Expenses: 'orange',
 };
 
-const demoAccounts = [
-  { _id: '1', code: '1000', name: 'Assets', type: 'Assets', balance: 750000, level: 0 },
-  { _id: '2', code: '1100', name: 'Current Assets', type: 'Assets', balance: 345200, level: 1 },
-  { _id: '3', code: '1110', name: 'Cash', type: 'Assets', balance: 125000, level: 2 },
-  { _id: '4', code: '1120', name: 'Accounts Receivable', type: 'Assets', balance: 220200, level: 2 },
-  { _id: '5', code: '2000', name: 'Liabilities', type: 'Liabilities', balance: 145000, level: 0 },
-  { _id: '6', code: '2100', name: 'Accounts Payable', type: 'Liabilities', balance: 95000, level: 1 },
-  { _id: '7', code: '3000', name: 'Equity', type: 'Equity', balance: null, level: 0 },
-  { _id: '8', code: '4000', name: 'Revenue', type: 'Revenue', balance: 590215, level: 0 },
-  { _id: '9', code: '4100', name: 'Sales Revenue', type: 'Revenue', balance: 520000, level: 1 },
-  { _id: '10', code: '5000', name: 'Expenses', type: 'Expenses', balance: 385000, level: 0 },
-  { _id: '11', code: '5100', name: 'Salaries', type: 'Expenses', balance: 186000, level: 1 },
-];
-
-const initialForm = { code: '', name: '', type: 'Assets', parentAccount: '' };
+const initialForm = { code: '', name: '', type: 'Assets', parentCode: '', balance: '' };
 
 const ChartOfAccounts = () => {
-  const [accounts] = useState(demoAccounts);
+  const [accounts, setAccounts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(initialForm);
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  const fetchAccounts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await getChartOfAccounts();
+      setAccounts(res.data.data || []);
+    } catch {
+      toast.error('Failed to load chart of accounts');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAccounts();
+  }, [fetchAccounts]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
   };
 
-  const handleSubmit = (e) => {
+  const validate = () => {
+    const errs = {};
+    if (!form.code.trim()) errs.code = 'Code is required';
+    if (!form.name.trim()) errs.name = 'Name is required';
+    if (!form.type) errs.type = 'Type is required';
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.code || !form.name) {
-      toast.error('Account Code and Name are required');
-      return;
+    if (!validate()) return;
+    setSaving(true);
+    try {
+      const payload = { ...form };
+      if (payload.balance !== '') payload.balance = Number(payload.balance);
+      else delete payload.balance;
+      if (!payload.parentCode) delete payload.parentCode;
+      await createChartAccount(payload);
+      toast.success('Account added successfully');
+      setModalOpen(false);
+      setForm(initialForm);
+      fetchAccounts();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to add account');
+    } finally {
+      setSaving(false);
     }
-    toast.success('Account added successfully');
-    setModalOpen(false);
-    setForm(initialForm);
+  };
+
+  const handleDelete = async (row) => {
+    if (!window.confirm(`Delete account "${row.name}"?`)) return;
+    try {
+      await deleteChartAccount(row._id);
+      toast.success('Account deleted');
+      fetchAccounts();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to delete');
+    }
   };
 
   const handleExport = () => toast.success('Export started');
@@ -62,7 +105,7 @@ const ChartOfAccounts = () => {
       key: 'code',
       label: 'ACCOUNT CODE',
       render: (row) => (
-        <span className="font-mono text-sm" style={{ marginLeft: `${row.level * 24}px` }}>
+        <span className="font-mono text-sm" style={{ marginLeft: `${(row.level || 0) * 24}px` }}>
           {row.code}
         </span>
       ),
@@ -71,7 +114,10 @@ const ChartOfAccounts = () => {
       key: 'name',
       label: 'ACCOUNT NAME',
       render: (row) => (
-        <span className={`${row.level === 0 ? 'font-semibold text-gray-900' : 'text-gray-700'}`} style={{ marginLeft: `${row.level * 24}px` }}>
+        <span
+          className={row.level === 0 ? 'font-semibold text-gray-900' : 'text-gray-700'}
+          style={{ marginLeft: `${(row.level || 0) * 24}px` }}
+        >
           {row.name}
         </span>
       ),
@@ -89,15 +135,14 @@ const ChartOfAccounts = () => {
     {
       key: 'actions',
       label: 'ACTIONS',
-      render: () => (
-        <div className="flex items-center gap-1">
-          <button className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-blue-600" title="Edit">
-            <HiOutlinePencilSquare className="w-4 h-4" />
-          </button>
-          <button className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-red-600" title="Delete">
-            <HiOutlineTrash className="w-4 h-4" />
-          </button>
-        </div>
+      render: (row) => (
+        <button
+          onClick={() => handleDelete(row)}
+          className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-red-600"
+          title="Delete"
+        >
+          <HiOutlineTrash className="w-4 h-4" />
+        </button>
       ),
     },
   ];
@@ -106,7 +151,7 @@ const ChartOfAccounts = () => {
     <div>
       <PageHeader title="Chart of Accounts" subtitle="Manage accounting chart of accounts">
         <button
-          onClick={() => { setForm(initialForm); setModalOpen(true); }}
+          onClick={() => { setForm(initialForm); setErrors({}); setModalOpen(true); }}
           className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-orange-500 rounded-lg hover:bg-orange-600"
         >
           <HiOutlinePlus className="w-4 h-4" />
@@ -117,6 +162,7 @@ const ChartOfAccounts = () => {
       <DataTable
         columns={columns}
         data={accounts}
+        loading={loading}
         onSearch={() => {}}
         actions={
           <div className="flex items-center gap-2">
@@ -138,8 +184,8 @@ const ChartOfAccounts = () => {
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="Add Account" size="md">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormInput label="Account Code *" name="code" value={form.code} onChange={handleChange} placeholder="e.g. 1100" />
-            <FormInput label="Account Type" type="select" name="type" value={form.type} onChange={handleChange}>
+            <FormInput label="Account Code *" name="code" value={form.code} onChange={handleChange} error={errors.code} placeholder="e.g. 1100" />
+            <FormInput label="Account Type" type="select" name="type" value={form.type} onChange={handleChange} error={errors.type}>
               <option value="Assets">Assets</option>
               <option value="Liabilities">Liabilities</option>
               <option value="Equity">Equity</option>
@@ -147,19 +193,22 @@ const ChartOfAccounts = () => {
               <option value="Expenses">Expenses</option>
             </FormInput>
           </div>
-          <FormInput label="Account Name *" name="name" value={form.name} onChange={handleChange} placeholder="e.g. Current Assets" />
-          <FormInput label="Parent Account" type="select" name="parentAccount" value={form.parentAccount} onChange={handleChange}>
-            <option value="">None (Top Level)</option>
-            {accounts.filter((a) => a.level === 0).map((a) => (
-              <option key={a._id} value={a.code}>{a.code} - {a.name}</option>
-            ))}
-          </FormInput>
+          <FormInput label="Account Name *" name="name" value={form.name} onChange={handleChange} error={errors.name} placeholder="e.g. Current Assets" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormInput label="Parent Account" type="select" name="parentCode" value={form.parentCode} onChange={handleChange}>
+              <option value="">None (Top Level)</option>
+              {accounts.map((a) => (
+                <option key={a._id} value={a.code}>{a.code} - {a.name}</option>
+              ))}
+            </FormInput>
+            <FormInput label="Opening Balance" type="number" name="balance" value={form.balance} onChange={handleChange} placeholder="0" step="0.01" />
+          </div>
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
             <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
               Cancel
             </button>
-            <button type="submit" className="px-4 py-2.5 text-sm font-medium text-white bg-orange-500 rounded-lg hover:bg-orange-600">
-              Add Account
+            <button type="submit" disabled={saving} className="px-4 py-2.5 text-sm font-medium text-white bg-orange-500 rounded-lg hover:bg-orange-600 disabled:opacity-50">
+              {saving ? 'Saving...' : 'Add Account'}
             </button>
           </div>
         </form>

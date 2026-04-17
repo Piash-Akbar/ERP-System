@@ -10,6 +10,33 @@ const createTransactionSchema = Joi.object({
   date: Joi.date(),
   description: Joi.string().trim().allow(''),
   reference: Joi.string().trim().allow(''),
+  paymentMethod: Joi.string().trim().allow(''),
+});
+
+const createExpenseSchema = Joi.object({
+  category: Joi.string().trim().required(),
+  amount: Joi.number().min(0).required(),
+  account: objectId.allow('', null),
+  date: Joi.date(),
+  description: Joi.string().trim().allow(''),
+  paymentMethod: Joi.string().trim().allow(''),
+});
+
+const createIncomeSchema = Joi.object({
+  source: Joi.string().trim().required(),
+  amount: Joi.number().min(0).required(),
+  account: objectId.allow('', null),
+  date: Joi.date(),
+  description: Joi.string().trim().allow(''),
+  paymentMethod: Joi.string().trim().allow(''),
+});
+
+const createChartAccountSchema = Joi.object({
+  code: Joi.string().trim().required(),
+  name: Joi.string().trim().required(),
+  type: Joi.string().valid('Assets', 'Liabilities', 'Equity', 'Revenue', 'Expenses').required(),
+  parentCode: Joi.string().trim().allow(''),
+  balance: Joi.number(),
 });
 
 const createBankAccountSchema = Joi.object({
@@ -36,4 +63,7 @@ module.exports = {
   createTransactionSchema,
   createBankAccountSchema,
   updateBankAccountSchema,
+  createExpenseSchema,
+  createIncomeSchema,
+  createChartAccountSchema,
 };

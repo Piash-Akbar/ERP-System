@@ -4,6 +4,7 @@ import { HiOutlineBars3, HiOutlineBell, HiOutlineUser, HiOutlineArrowRightOnRect
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { getNotifications, getUnreadCount, markAsRead, markAllAsRead } from '../services/notification.service';
+import WarehouseSelector from '../components/WarehouseSelector';
 
 const timeAgo = (date) => {
   const seconds = Math.floor((new Date() - new Date(date)) / 1000);
@@ -137,6 +138,9 @@ const Navbar = ({ onMenuClick }) => {
 
       {/* Right side */}
       <div className="flex items-center gap-3">
+        {/* Warehouse Selector */}
+        <WarehouseSelector />
+
         {/* Dark mode toggle */}
         <button
           onClick={() => toggleDarkMode(!darkMode)}

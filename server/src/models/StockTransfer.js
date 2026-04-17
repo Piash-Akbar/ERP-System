@@ -38,6 +38,14 @@ const stockTransferSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
     },
+    transferNumber: {
+      type: String,
+      trim: true,
+    },
+    branch: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Branch',
+    },
   },
   { timestamps: true }
 );

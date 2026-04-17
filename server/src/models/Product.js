@@ -35,6 +35,15 @@ const variantSchema = new mongoose.Schema(
       type: Number,
       default: 5,
     },
+    barcode: {
+      type: String,
+      trim: true,
+    },
+    barcodeType: {
+      type: String,
+      enum: ['CODE128', 'EAN13', 'EAN8', 'UPC', 'QR'],
+      default: 'CODE128',
+    },
   },
   { _id: true }
 );
@@ -137,6 +146,16 @@ const productSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Warehouse',
     },
+    barcode: {
+      type: String,
+      trim: true,
+      sparse: true,
+    },
+    barcodeType: {
+      type: String,
+      enum: ['CODE128', 'EAN13', 'EAN8', 'UPC', 'QR'],
+      default: 'CODE128',
+    },
     isActive: {
       type: Boolean,
       default: true,
@@ -151,5 +170,6 @@ const productSchema = new mongoose.Schema(
 
 productSchema.index({ category: 1, isDeleted: 1 });
 productSchema.index({ brand: 1, isDeleted: 1 });
+productSchema.index({ barcode: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model('Product', productSchema);

@@ -14,6 +14,12 @@ import {
   HiOutlineCog6Tooth,
   HiOutlineWrench,
   HiOutlineClipboardDocumentList,
+  HiOutlineCheckBadge,
+  HiOutlineUserCircle,
+  HiOutlineBuildingOffice,
+  HiOutlineDocumentText,
+  HiOutlineQrCode,
+  HiOutlineBuildingStorefront,
 } from 'react-icons/hi2';
 
 export const sidebarMenu = [
@@ -73,6 +79,21 @@ export const sidebarMenu = [
       { name: 'Opening Stock', path: '/inventory/opening-stock' },
       { name: 'Stock Adjustment', path: '/inventory/adjustment' },
       { name: 'Product Movement', path: '/inventory/movement' },
+    ],
+  },
+  {
+    name: 'Warehouse Ops',
+    icon: HiOutlineBuildingStorefront,
+    children: [
+      { name: 'Dashboard', path: '/warehouse' },
+      { name: 'Goods Receiving', path: '/warehouse/receiving' },
+      { name: 'Goods Issue', path: '/warehouse/issue' },
+      { name: 'Transfer', path: '/warehouse/transfer' },
+      { name: 'Reconciliation', path: '/warehouse/reconciliation' },
+      { name: 'Stock Count', path: '/warehouse/stock-count' },
+      { name: 'Ledger', path: '/warehouse/ledger' },
+      { name: 'Returns', path: '/warehouse/returns' },
+      { name: 'Settings', path: '/warehouse/settings' },
     ],
   },
   {
@@ -154,6 +175,48 @@ export const sidebarMenu = [
       { name: 'Tax Management', path: '/setup/tax' },
       { name: 'Country Management', path: '/setup/country' },
       { name: 'Language Management', path: '/setup/language' },
+    ],
+  },
+  {
+    name: 'User Management',
+    icon: HiOutlineUserCircle,
+    children: [
+      { name: 'Users', path: '/users' },
+    ],
+  },
+  {
+    name: 'Approvals',
+    icon: HiOutlineCheckBadge,
+    children: [
+      { name: 'Approval Queue', path: '/approvals' },
+      { name: 'My Submissions', path: '/approvals/my-submissions' },
+      { name: 'Approval Rules', path: '/approvals/rules' },
+    ],
+  },
+  {
+    name: 'Asset Management',
+    icon: HiOutlineBuildingOffice,
+    children: [
+      { name: 'Assets', path: '/assets' },
+      { name: 'Asset Categories', path: '/assets/categories' },
+    ],
+  },
+  {
+    name: 'Documents',
+    icon: HiOutlineDocumentText,
+    children: [
+      { name: 'All Documents', path: '/documents' },
+      { name: 'Expiring Documents', path: '/documents/expiring' },
+    ],
+  },
+  {
+    name: 'Barcode Management',
+    icon: HiOutlineQrCode,
+    children: [
+      { name: 'Barcode Dashboard', path: '/barcodes' },
+      { name: 'Generate Barcodes', path: '/barcodes/generate' },
+      { name: 'Print Labels', path: '/barcodes/print' },
+      { name: 'Scanner', path: '/barcodes/scan' },
     ],
   },
   {

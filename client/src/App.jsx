@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { WarehouseProvider } from './context/WarehouseContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './layouts/MainLayout';
 import Login from './pages/Login';
@@ -94,6 +95,43 @@ import LanguageManagement from './pages/setup/LanguageManagement';
 // Activity Log
 import ActivityLogList from './pages/activitylog/ActivityLogList';
 
+// User Management
+import UserList from './pages/users/UserList';
+
+// Approvals
+import ApprovalQueue from './pages/approvals/ApprovalQueue';
+import ApprovalDetail from './pages/approvals/ApprovalDetail';
+import MySubmissions from './pages/approvals/MySubmissions';
+import ApprovalRulesConfig from './pages/approvals/ApprovalRulesConfig';
+
+// Assets
+import AssetList from './pages/assets/AssetList';
+import AssetForm from './pages/assets/AssetForm';
+import AssetDetail from './pages/assets/AssetDetail';
+import AssetCategories from './pages/assets/AssetCategories';
+
+// Documents
+import DocumentList from './pages/documents/DocumentList';
+import DocumentDetail from './pages/documents/DocumentDetail';
+import ExpiringDocuments from './pages/documents/ExpiringDocuments';
+
+// Barcodes
+import BarcodeDashboard from './pages/barcodes/BarcodeDashboard';
+import BarcodeGenerator from './pages/barcodes/BarcodeGenerator';
+import BarcodePrint from './pages/barcodes/BarcodePrint';
+import BarcodeScanner from './pages/barcodes/BarcodeScanner';
+
+// Warehouse Operations
+import WarehouseDashboard from './pages/warehouse/WarehouseDashboard';
+import GoodsReceiving from './pages/warehouse/GoodsReceiving';
+import GoodsIssue from './pages/warehouse/GoodsIssue';
+import WarehouseTransfer from './pages/warehouse/WarehouseTransfer';
+import StockReconciliation from './pages/warehouse/StockReconciliation';
+import PhysicalStockCount from './pages/warehouse/PhysicalStockCount';
+import WarehouseLedger from './pages/warehouse/WarehouseLedger';
+import WarehouseReturns from './pages/warehouse/WarehouseReturns';
+import WarehouseOpsSettings from './pages/warehouse/WarehouseOpsSettings';
+
 // Profile
 import Profile from './pages/Profile';
 
@@ -102,6 +140,7 @@ const App = () => {
     <BrowserRouter>
       <ThemeProvider>
       <AuthProvider>
+        <WarehouseProvider>
         <Routes>
           {/* Public routes */}
           <Route path="/login" element={<Login />} />
@@ -199,6 +238,44 @@ const App = () => {
             <Route path="/setup/country" element={<CountryManagement />} />
             <Route path="/setup/language" element={<LanguageManagement />} />
 
+            {/* User Management */}
+            <Route path="/users" element={<UserList />} />
+
+            {/* Approvals */}
+            <Route path="/approvals" element={<ApprovalQueue />} />
+            <Route path="/approvals/my-submissions" element={<MySubmissions />} />
+            <Route path="/approvals/rules" element={<ApprovalRulesConfig />} />
+            <Route path="/approvals/:id" element={<ApprovalDetail />} />
+
+            {/* Assets */}
+            <Route path="/assets" element={<AssetList />} />
+            <Route path="/assets/new" element={<AssetForm />} />
+            <Route path="/assets/categories" element={<AssetCategories />} />
+            <Route path="/assets/:id/edit" element={<AssetForm />} />
+            <Route path="/assets/:id" element={<AssetDetail />} />
+
+            {/* Documents */}
+            <Route path="/documents" element={<DocumentList />} />
+            <Route path="/documents/expiring" element={<ExpiringDocuments />} />
+            <Route path="/documents/:id" element={<DocumentDetail />} />
+
+            {/* Warehouse Operations */}
+            <Route path="/warehouse" element={<WarehouseDashboard />} />
+            <Route path="/warehouse/receiving" element={<GoodsReceiving />} />
+            <Route path="/warehouse/issue" element={<GoodsIssue />} />
+            <Route path="/warehouse/transfer" element={<WarehouseTransfer />} />
+            <Route path="/warehouse/reconciliation" element={<StockReconciliation />} />
+            <Route path="/warehouse/stock-count" element={<PhysicalStockCount />} />
+            <Route path="/warehouse/ledger" element={<WarehouseLedger />} />
+            <Route path="/warehouse/returns" element={<WarehouseReturns />} />
+            <Route path="/warehouse/settings" element={<WarehouseOpsSettings />} />
+
+            {/* Barcodes */}
+            <Route path="/barcodes" element={<BarcodeDashboard />} />
+            <Route path="/barcodes/generate" element={<BarcodeGenerator />} />
+            <Route path="/barcodes/print" element={<BarcodePrint />} />
+            <Route path="/barcodes/scan" element={<BarcodeScanner />} />
+
             {/* Activity Log */}
             <Route path="/activity-log" element={<ActivityLogList />} />
 
@@ -217,6 +294,7 @@ const App = () => {
             style: { fontSize: '14px' },
           }}
         />
+      </WarehouseProvider>
       </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>

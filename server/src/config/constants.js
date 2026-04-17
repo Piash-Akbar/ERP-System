@@ -8,6 +8,7 @@ const ROLES = {
   HR_MANAGER: 'hr_manager',
   BRANCH_MANAGER: 'branch_manager',
   STAFF: 'staff',
+  WAREHOUSE_MANAGER: 'warehouse_manager',
 };
 
 const MODULES = {
@@ -27,6 +28,12 @@ const MODULES = {
   MANUFACTURING: 'manufacturing',
   CNF: 'cnf',
   NOTIFICATIONS: 'notifications',
+  APPROVALS: 'approvals',
+  USERS: 'users',
+  ASSETS: 'assets',
+  DOCUMENTS: 'documents',
+  BARCODES: 'barcodes',
+  WAREHOUSE: 'warehouse',
 };
 
 const PERMISSIONS = {

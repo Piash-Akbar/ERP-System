@@ -54,6 +54,10 @@ const transactionSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    paymentMethod: {
+      type: String,
+      trim: true,
+    },
     attachments: [String],
     journalEntries: [journalEntrySchema],
     createdBy: {

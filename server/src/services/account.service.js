@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Transaction = require('../models/Transaction');
 const BankAccount = require('../models/BankAccount');
+const ChartAccount = require('../models/ChartAccount');
 const ApiError = require('../utils/apiError');
 const { paginate } = require('../utils/pagination');
 
@@ -189,6 +190,128 @@ const getSummary = async (query = {}) => {
   };
 };
 
+// ----- Expenses -----
+const getExpenses = async (query = {}) => {
+  return getTransactions({ ...query, type: 'expense' });
+};
+
+const createExpense = async (data, userId) => {
+  return createTransaction({ ...data, type: 'expense' }, userId);
+};
+
+const deleteExpense = async (id) => deleteTransaction(id);
+
+// ----- Incomes -----
+const getIncomes = async (query = {}) => {
+  const baseQuery = { ...query, type: 'income' };
+  if (query.search) baseQuery.search = query.search;
+  return getTransactions(baseQuery);
+};
+
+const createIncome = async (data, userId) => {
+  const { source, ...rest } = data;
+  return createTransaction(
+    { ...rest, type: 'income', category: source || data.category },
+    userId
+  );
+};
+
+const deleteIncome = async (id) => deleteTransaction(id);
+
+// ----- Chart of Accounts -----
+const getChartOfAccounts = async () => {
+  return ChartAccount.find({ isDeleted: false }).sort({ code: 1 }).lean();
+};
+
+const createChartAccount = async (data) => {
+  const level = data.parentCode
+    ? ((await ChartAccount.findOne({ code: data.parentCode, isDeleted: false }))?.level ?? 0) + 1
+    : 0;
+  const exists = await ChartAccount.findOne({ code: data.code, isDeleted: false });
+  if (exists) throw new ApiError('Account code already exists', 400);
+  return ChartAccount.create({ ...data, level });
+};
+
+const deleteChartAccount = async (id) => {
+  const acc = await ChartAccount.findOneAndUpdate(
+    { _id: id, isDeleted: false },
+    { isDeleted: true },
+    { new: true }
+  );
+  if (!acc) throw new ApiError('Chart account not found', 404);
+  return acc;
+};
+
+// ----- Profit & Loss -----
+const getProfitLoss = async (query = {}) => {
+  const { startDate, endDate } = query;
+  const match = { isDeleted: false };
+  if (startDate || endDate) {
+    match.date = {};
+    if (startDate) match.date.$gte = new Date(startDate);
+    if (endDate) match.date.$lte = new Date(endDate);
+  }
+
+  const [totals] = await Transaction.aggregate([
+    { $match: match },
+    {
+      $group: {
+        _id: null,
+        totalRevenue: { $sum: { $cond: [{ $eq: ['$type', 'income'] }, '$amount', 0] } },
+        totalExpenses: { $sum: { $cond: [{ $eq: ['$type', 'expense'] }, '$amount', 0] } },
+      },
+    },
+  ]);
+
+  const totalRevenue = totals?.totalRevenue || 0;
+  const totalExpenses = totals?.totalExpenses || 0;
+  const netProfit = totalRevenue - totalExpenses;
+
+  const monthly = await Transaction.aggregate([
+    { $match: match },
+    {
+      $group: {
+        _id: { y: { $year: '$date' }, m: { $month: '$date' } },
+        sales: { $sum: { $cond: [{ $eq: ['$type', 'income'] }, '$amount', 0] } },
+        expenses: { $sum: { $cond: [{ $eq: ['$type', 'expense'] }, '$amount', 0] } },
+      },
+    },
+    { $sort: { '_id.y': 1, '_id.m': 1 } },
+    { $limit: 12 },
+  ]);
+
+  const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthlyData = monthly.map((m) => ({
+    month: monthLabels[m._id.m - 1],
+    sales: m.sales,
+    expenses: m.expenses,
+    profit: m.sales - m.expenses,
+  }));
+
+  const revenueBreakdown = await Transaction.aggregate([
+    { $match: { ...match, type: 'income' } },
+    { $group: { _id: '$category', amount: { $sum: '$amount' } } },
+    { $project: { _id: 0, label: '$_id', amount: 1 } },
+    { $sort: { amount: -1 } },
+  ]);
+
+  const expenseBreakdown = await Transaction.aggregate([
+    { $match: { ...match, type: 'expense' } },
+    { $group: { _id: '$category', amount: { $sum: '$amount' } } },
+    { $project: { _id: 0, label: '$_id', amount: 1 } },
+    { $sort: { amount: -1 } },
+  ]);
+
+  return {
+    totalRevenue,
+    totalExpenses,
+    netProfit,
+    monthlyData,
+    revenueBreakdown,
+    expenseBreakdown,
+  };
+};
+
 module.exports = {
   getTransactions,
   createTransaction,
@@ -198,4 +321,14 @@ module.exports = {
   updateBankAccount,
   deleteBankAccount,
   getSummary,
+  getExpenses,
+  createExpense,
+  deleteExpense,
+  getIncomes,
+  createIncome,
+  deleteIncome,
+  getChartOfAccounts,
+  createChartAccount,
+  deleteChartAccount,
+  getProfitLoss,
 };

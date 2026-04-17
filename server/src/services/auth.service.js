@@ -60,6 +60,7 @@ const login = async ({ email, password }) => {
   const refreshToken = generateRefreshToken(user._id);
 
   user.refreshToken = refreshToken;
+  user.lastLogin = new Date();
   await user.save();
 
   user.password = undefined;

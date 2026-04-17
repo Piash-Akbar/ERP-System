@@ -37,6 +37,9 @@ const userSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Branch',
     },
+    lastLogin: {
+      type: Date,
+    },
     isActive: {
       type: Boolean,
       default: true,

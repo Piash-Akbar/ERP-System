@@ -44,6 +44,14 @@ app.use('/api/v1/leave', require('./routes/leave.routes'));
 app.use('/api/v1/cnf', require('./routes/cnf.routes'));
 app.use('/api/v1/notifications', require('./routes/notification.routes'));
 app.use('/api/v1/manufacturing', require('./routes/manufacturing.routes'));
+app.use('/api/v1/users', require('./routes/user.routes'));
+app.use('/api/v1/approvals', require('./routes/approval.routes'));
+app.use('/api/v1/approval-rules', require('./routes/approvalRule.routes'));
+app.use('/api/v1/assets', require('./routes/asset.routes'));
+app.use('/api/v1/asset-categories', require('./routes/assetCategory.routes'));
+app.use('/api/v1/documents', require('./routes/document.routes'));
+app.use('/api/v1/barcodes', require('./routes/barcode.routes'));
+app.use('/api/v1/warehouse-ops', require('./routes/warehouseOps.routes'));
 
 // Health check
 app.get('/api/v1/health', (req, res) => {
