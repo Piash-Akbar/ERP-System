@@ -1,10 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Plus, Trash2, Search } from 'lucide-react';
+import { Trash2, Search } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { formatCurrency, type CurrencyCode } from '@/lib/money';
 import { CORP_DISCOUNT_APPROVAL_THRESHOLD } from '@/server/validators/corporate-sales';
 
