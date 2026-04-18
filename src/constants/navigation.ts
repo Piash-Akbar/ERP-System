@@ -151,6 +151,12 @@ export const MODULES: NavModule[] = [
     href: '/accounts',
     iconName: 'Banknote',
     permission: 'accounts:read',
+    items: [
+      { label: 'Overview', href: '/accounts', permission: 'accounts:read' },
+      { label: 'Journals', href: '/accounts/journals', permission: 'accounts:read' },
+      { label: 'New journal', href: '/accounts/journals/new', permission: 'accounts:post' },
+      { label: 'Trial balance', href: '/accounts/trial-balance', permission: 'accounts:read' },
+    ],
   },
   {
     number: 14,

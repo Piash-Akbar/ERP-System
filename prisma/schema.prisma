@@ -387,6 +387,8 @@ model Branch {
   corporateOrders     CorporateOrder[]
   corporateDeliveries CorporateDelivery[]
   corporateInvoices   CorporateInvoice[]
+  chartAccounts       ChartAccount[]
+  journalEntries      JournalEntry[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -406,6 +408,8 @@ model Period {
   startsAt DateTime
   endsAt   DateTime
   status   PeriodStatus @default(OPEN)
+
+  journalEntries JournalEntry[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1840,4 +1844,156 @@ model CorporateInvoicePayment {
 
   @@index([invoiceId])
   @@index([method])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Chart of Accounts (Module 14) — adjacency list + materialized path
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+enum AccountNormalSide {
+  DEBIT
+  CREDIT
+}
+
+model ChartAccount {
+  id             String            @id @default(cuid())
+  code           String            @unique
+  name           String
+  type           AccountType
+  normalSide     AccountNormalSide
+  parentId       String?
+  parent         ChartAccount?     @relation("AccountTree", fields: [parentId], references: [id])
+  children       ChartAccount[]    @relation("AccountTree")
+  path           String
+  depth          Int               @default(0)
+  isPosting      Boolean           @default(true)
+  isControl      Boolean           @default(false)
+  currency       CurrencyCode      @default(BDT)
+  branchId       String?
+  branch         Branch?           @relation(fields: [branchId], references: [id])
+  openingBalance Decimal           @default(0) @db.Decimal(18, 4)
+  description    String?
+  isActive       Boolean           @default(true)
+  isSystem       Boolean           @default(false)
+
+  journalLines    JournalEntryLine[]
+  systemMappings  SystemAccountMapping[]
+
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([type])
+  @@index([parentId])
+  @@index([path])
+  @@index([branchId])
+  @@index([isActive])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Accounts & Finance (Module 13) — Journal entries, system account mappings
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum JournalStatus {
+  DRAFT
+  POSTED
+  VOIDED
+}
+
+enum SystemAccountKey {
+  CASH
+  BANK_DEFAULT
+  AR_CONTROL
+  AP_CONTROL
+  INVENTORY
+  COGS
+  SALES_REVENUE
+  SALES_RETURNS
+  DISCOUNT_GIVEN
+  TAX_PAYABLE
+  TAX_RECOVERABLE
+  PURCHASE_EXPENSE
+  FX_GAIN
+  FX_LOSS
+  RETAINED_EARNINGS
+  OPENING_BALANCE_EQUITY
+  ROUNDING
+}
+
+model SystemAccountMapping {
+  id        String           @id @default(cuid())
+  key       SystemAccountKey
+  branchId  String?
+  accountId String
+  account   ChartAccount     @relation(fields: [accountId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([key, branchId])
+  @@index([accountId])
+}
+
+model JournalEntry {
+  id             String        @id @default(cuid())
+  number         String        @unique
+  branchId       String
+  branch         Branch        @relation(fields: [branchId], references: [id])
+  periodId       String
+  period         Period        @relation(fields: [periodId], references: [id])
+  date           DateTime
+  memo           String?
+  reference      String?
+  status         JournalStatus @default(DRAFT)
+  sourceModule   String?
+  sourceRefType  String?
+  sourceRefId    String?
+  reversesId     String?       @unique
+  reverses       JournalEntry? @relation("JournalReversal", fields: [reversesId], references: [id])
+  reversedBy     JournalEntry? @relation("JournalReversal")
+
+  totalDebit  Decimal @default(0) @db.Decimal(18, 4)
+  totalCredit Decimal @default(0) @db.Decimal(18, 4)
+
+  lines       JournalEntryLine[]
+
+  createdById String?
+  postedById  String?
+  postedAt    DateTime?
+  voidedById  String?
+  voidedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([sourceModule, sourceRefType, sourceRefId])
+  @@index([branchId, date])
+  @@index([status])
+  @@index([periodId])
+}
+
+model JournalEntryLine {
+  id        String       @id @default(cuid())
+  entryId   String
+  entry     JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  lineNo    Int
+  accountId String
+  account   ChartAccount @relation(fields: [accountId], references: [id])
+  debit     Decimal      @default(0) @db.Decimal(18, 4)
+  credit    Decimal      @default(0) @db.Decimal(18, 4)
+  currency  CurrencyCode @default(BDT)
+  fxRate    Decimal      @default(1) @db.Decimal(18, 6)
+  costCenter String?
+  memo      String?
+
+  @@index([entryId])
+  @@index([accountId])
 }

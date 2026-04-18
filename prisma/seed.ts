@@ -266,6 +266,162 @@ async function main() {
   }
   console.log(`  ✓ default warehouse per branch`);
 
+  // 9. Default Chart of Accounts
+  type CoaSeed = {
+    code: string;
+    name: string;
+    type: 'ASSET' | 'LIABILITY' | 'EQUITY' | 'INCOME' | 'EXPENSE';
+    normalSide: 'DEBIT' | 'CREDIT';
+    parent?: string;
+    isPosting?: boolean;
+    isControl?: boolean;
+    systemKey?:
+      | 'CASH'
+      | 'BANK_DEFAULT'
+      | 'AR_CONTROL'
+      | 'AP_CONTROL'
+      | 'INVENTORY'
+      | 'COGS'
+      | 'SALES_REVENUE'
+      | 'SALES_RETURNS'
+      | 'DISCOUNT_GIVEN'
+      | 'TAX_PAYABLE'
+      | 'TAX_RECOVERABLE'
+      | 'PURCHASE_EXPENSE'
+      | 'FX_GAIN'
+      | 'FX_LOSS'
+      | 'RETAINED_EARNINGS'
+      | 'OPENING_BALANCE_EQUITY'
+      | 'ROUNDING';
+  };
+  const COA: CoaSeed[] = [
+    // Assets
+    { code: '1000', name: 'Assets', type: 'ASSET', normalSide: 'DEBIT', isPosting: false },
+    { code: '1100', name: 'Current Assets', type: 'ASSET', normalSide: 'DEBIT', parent: '1000', isPosting: false },
+    { code: '1110', name: 'Cash on Hand', type: 'ASSET', normalSide: 'DEBIT', parent: '1100', systemKey: 'CASH' },
+    { code: '1120', name: 'Bank — Operating', type: 'ASSET', normalSide: 'DEBIT', parent: '1100', systemKey: 'BANK_DEFAULT' },
+    {
+      code: '1130',
+      name: 'Accounts Receivable',
+      type: 'ASSET',
+      normalSide: 'DEBIT',
+      parent: '1100',
+      isControl: true,
+      systemKey: 'AR_CONTROL',
+    },
+    {
+      code: '1140',
+      name: 'Inventory',
+      type: 'ASSET',
+      normalSide: 'DEBIT',
+      parent: '1100',
+      isControl: true,
+      systemKey: 'INVENTORY',
+    },
+    { code: '1150', name: 'Input Tax Recoverable', type: 'ASSET', normalSide: 'DEBIT', parent: '1100', systemKey: 'TAX_RECOVERABLE' },
+    { code: '1200', name: 'Fixed Assets', type: 'ASSET', normalSide: 'DEBIT', parent: '1000', isPosting: false },
+    { code: '1210', name: 'Machinery & Equipment', type: 'ASSET', normalSide: 'DEBIT', parent: '1200' },
+    { code: '1220', name: 'Accumulated Depreciation', type: 'ASSET', normalSide: 'CREDIT', parent: '1200' },
+
+    // Liabilities
+    { code: '2000', name: 'Liabilities', type: 'LIABILITY', normalSide: 'CREDIT', isPosting: false },
+    {
+      code: '2100',
+      name: 'Accounts Payable',
+      type: 'LIABILITY',
+      normalSide: 'CREDIT',
+      parent: '2000',
+      isControl: true,
+      systemKey: 'AP_CONTROL',
+    },
+    { code: '2200', name: 'Tax Payable', type: 'LIABILITY', normalSide: 'CREDIT', parent: '2000', systemKey: 'TAX_PAYABLE' },
+    { code: '2300', name: 'Accrued Expenses', type: 'LIABILITY', normalSide: 'CREDIT', parent: '2000' },
+
+    // Equity
+    { code: '3000', name: 'Equity', type: 'EQUITY', normalSide: 'CREDIT', isPosting: false },
+    { code: '3100', name: "Owner's Capital", type: 'EQUITY', normalSide: 'CREDIT', parent: '3000' },
+    { code: '3200', name: 'Retained Earnings', type: 'EQUITY', normalSide: 'CREDIT', parent: '3000', systemKey: 'RETAINED_EARNINGS' },
+    {
+      code: '3900',
+      name: 'Opening Balance Equity',
+      type: 'EQUITY',
+      normalSide: 'CREDIT',
+      parent: '3000',
+      systemKey: 'OPENING_BALANCE_EQUITY',
+    },
+
+    // Income
+    { code: '4000', name: 'Income', type: 'INCOME', normalSide: 'CREDIT', isPosting: false },
+    { code: '4100', name: 'Sales Revenue', type: 'INCOME', normalSide: 'CREDIT', parent: '4000', systemKey: 'SALES_REVENUE' },
+    { code: '4150', name: 'Sales Returns & Allowances', type: 'INCOME', normalSide: 'DEBIT', parent: '4000', systemKey: 'SALES_RETURNS' },
+    { code: '4200', name: 'FX Gain', type: 'INCOME', normalSide: 'CREDIT', parent: '4000', systemKey: 'FX_GAIN' },
+    { code: '4900', name: 'Rounding Income', type: 'INCOME', normalSide: 'CREDIT', parent: '4000', systemKey: 'ROUNDING' },
+
+    // Expenses
+    { code: '5000', name: 'Expenses', type: 'EXPENSE', normalSide: 'DEBIT', isPosting: false },
+    { code: '5100', name: 'Cost of Goods Sold', type: 'EXPENSE', normalSide: 'DEBIT', parent: '5000', systemKey: 'COGS' },
+    { code: '5150', name: 'Discount Given', type: 'EXPENSE', normalSide: 'DEBIT', parent: '5000', systemKey: 'DISCOUNT_GIVEN' },
+    { code: '5200', name: 'Purchase Expense (non-stock)', type: 'EXPENSE', normalSide: 'DEBIT', parent: '5000', systemKey: 'PURCHASE_EXPENSE' },
+    { code: '5300', name: 'Operating Expenses', type: 'EXPENSE', normalSide: 'DEBIT', parent: '5000', isPosting: false },
+    { code: '5310', name: 'Salaries & Wages', type: 'EXPENSE', normalSide: 'DEBIT', parent: '5300' },
+    { code: '5320', name: 'Rent', type: 'EXPENSE', normalSide: 'DEBIT', parent: '5300' },
+    { code: '5330', name: 'Utilities', type: 'EXPENSE', normalSide: 'DEBIT', parent: '5300' },
+    { code: '5400', name: 'FX Loss', type: 'EXPENSE', normalSide: 'DEBIT', parent: '5000', systemKey: 'FX_LOSS' },
+  ];
+
+  const codeToId = new Map<string, string>();
+  for (const a of COA) {
+    const parentId = a.parent ? codeToId.get(a.parent) ?? null : null;
+    const parent = parentId ? await prisma.chartAccount.findUnique({ where: { id: parentId } }) : null;
+    const path = parent ? `${parent.path}/${a.code}` : a.code;
+    const depth = parent ? parent.depth + 1 : 0;
+
+    const account = await prisma.chartAccount.upsert({
+      where: { code: a.code },
+      update: {
+        name: a.name,
+        type: a.type,
+        normalSide: a.normalSide,
+        parentId,
+        path,
+        depth,
+        isPosting: a.isPosting ?? true,
+        isControl: a.isControl ?? false,
+        isSystem: true,
+      },
+      create: {
+        code: a.code,
+        name: a.name,
+        type: a.type,
+        normalSide: a.normalSide,
+        parentId,
+        path,
+        depth,
+        isPosting: a.isPosting ?? true,
+        isControl: a.isControl ?? false,
+        isSystem: true,
+      },
+    });
+    codeToId.set(a.code, account.id);
+
+    if (a.systemKey) {
+      const existing = await prisma.systemAccountMapping.findFirst({
+        where: { key: a.systemKey, branchId: null },
+      });
+      if (existing) {
+        await prisma.systemAccountMapping.update({
+          where: { id: existing.id },
+          data: { accountId: account.id },
+        });
+      } else {
+        await prisma.systemAccountMapping.create({
+          data: { key: a.systemKey, branchId: null, accountId: account.id },
+        });
+      }
+    }
+  }
+  console.log(`  ✓ ${COA.length} chart-of-account rows + system mappings`);
+
   console.log('✅ Seed complete');
 }
 
