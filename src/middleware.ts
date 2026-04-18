@@ -1,5 +1,8 @@
-import { auth } from '@/server/auth/config';
+import NextAuth from 'next-auth';
 import { NextResponse } from 'next/server';
+import { authConfig } from '@/server/auth/config.edge';
+
+const { auth } = NextAuth(authConfig);
 
 const PUBLIC_PREFIXES = ['/login', '/forgot-password'];
 

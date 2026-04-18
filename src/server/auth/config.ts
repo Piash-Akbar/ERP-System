@@ -1,43 +1,17 @@
-import NextAuth, { type DefaultSession } from 'next-auth';
+import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '@/server/db';
+import { authConfig } from './config.edge';
 
 const credentialsSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
 });
 
-declare module 'next-auth' {
-  interface Session {
-    user: {
-      id: string;
-      roles: string[];
-      permissions: string[];
-      activeBranchId: string | null;
-    } & DefaultSession['user'];
-  }
-
-  interface User {
-    roles?: string[];
-    permissions?: string[];
-    activeBranchId?: string | null;
-  }
-}
-
-interface AppToken {
-  id?: string;
-  roles?: string[];
-  permissions?: string[];
-  activeBranchId?: string | null;
-  [key: string]: unknown;
-}
-
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  session: { strategy: 'jwt' },
-  pages: { signIn: '/login' },
-  trustHost: true,
+  ...authConfig,
   providers: [
     Credentials({
       credentials: {
@@ -83,24 +57,4 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user }) {
-      const t = token as AppToken;
-      if (user) {
-        t.id = user.id as string;
-        t.roles = user.roles ?? [];
-        t.permissions = user.permissions ?? [];
-        t.activeBranchId = user.activeBranchId ?? null;
-      }
-      return t;
-    },
-    async session({ session, token }) {
-      const t = token as AppToken;
-      if (t.id) session.user.id = t.id;
-      session.user.roles = t.roles ?? [];
-      session.user.permissions = t.permissions ?? [];
-      session.user.activeBranchId = t.activeBranchId ?? null;
-      return session;
-    },
-  },
 });

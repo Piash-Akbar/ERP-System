@@ -28,8 +28,17 @@ export const PERMISSIONS = {
   // Phase 5
   crm: ['read', 'write', 'delete'],
   pos: ['sell', 'refund', 'discount-override', 'close-session'],
-  wholesale: ['read', 'write', 'return'],
-  'corporate-sales': ['read', 'quote', 'order', 'invoice', 'deliver'],
+  wholesale: ['read', 'write', 'return', 'payment', 'discount-override', 'void'],
+  'corporate-sales': [
+    'read',
+    'quote',
+    'order',
+    'invoice',
+    'deliver',
+    'payment',
+    'cancel',
+    'discount-override',
+  ],
   ecommerce: ['read', 'fulfill', 'refund'],
   trade: ['read', 'write'],
 

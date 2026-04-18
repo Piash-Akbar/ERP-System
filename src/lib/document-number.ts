@@ -15,3 +15,15 @@ export function nextSupplierCode(previousCount: number, pad = 3) {
 export function nextPaymentNumber(previousCount: number, pad = 3) {
   return `PAY-${(previousCount + 1).toString().padStart(pad, '0')}`;
 }
+
+export function nextProductionNumber(year: number, previousCount: number, pad = 3) {
+  return nextDocumentNumber('PRO', year, previousCount, pad);
+}
+
+export function nextAssetCode(previousCount: number, pad = 4) {
+  return `AST-${(previousCount + 1).toString().padStart(pad, '0')}`;
+}
+
+export function nextCustomerCode(previousCount: number, pad = 3) {
+  return `CUS-${(previousCount + 1).toString().padStart(pad, '0')}`;
+}

@@ -1,10 +1,34 @@
-import Link from 'next/link';
-import { Bell, Search, LogOut } from 'lucide-react';
-import { NAV } from '@/constants/navigation';
-import { cn } from '@/lib/utils';
+import { Search, LogOut } from 'lucide-react';
+import { MODULES } from '@/constants/navigation';
 import { getSession } from '@/server/auth/session';
 import { logoutAction } from '@/server/actions/auth';
 import { BranchSwitcher } from '@/components/shared/branch-switcher';
+import { NotificationBell } from '@/components/shared/notification-bell';
+import { SidebarNav, type ClientNavModule } from '@/components/shared/sidebar-nav';
+import { notificationService } from '@/server/services/notification.service';
+
+async function renderBell(hasPermission: boolean) {
+  if (!hasPermission) return null;
+  const [unread, items] = await Promise.all([
+    notificationService.unreadCount(await getSession()),
+    notificationService.list(await getSession(), { limit: 10 }),
+  ]);
+  return (
+    <NotificationBell
+      initialUnread={unread}
+      initialItems={items.map((n) => ({
+        id: n.id,
+        severity: n.severity,
+        module: n.module,
+        title: n.title,
+        body: n.body,
+        href: n.href,
+        readAt: n.readAt?.toISOString() ?? null,
+        createdAt: n.createdAt.toISOString(),
+      }))}
+    />
+  );
+}
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
   const session = await getSession();
@@ -16,12 +40,23 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
       .slice(0, 2)
       .toUpperCase() ?? '?';
 
-  const visibleGroups = NAV.map((group) => ({
-    ...group,
-    items: group.items.filter(
-      (item) => !item.permission || session?.permissions.includes(item.permission),
-    ),
-  })).filter((g) => g.items.length > 0);
+  const perms = session?.permissions ?? [];
+  const can = (p?: string) => !p || perms.includes(p);
+
+  const visibleModules: ClientNavModule[] = MODULES.filter((m) => {
+    if (!can(m.permission)) return false;
+    const childrenVisible = m.items?.some((i) => can(i.permission)) ?? false;
+    return !m.items || childrenVisible || can(m.permission);
+  }).map((m) => ({
+    number: m.number,
+    label: m.label,
+    href: m.href,
+    iconName: m.iconName,
+    items: m.items?.filter((i) => can(i.permission)).map((i) => ({
+      label: i.label,
+      href: i.href,
+    })),
+  }));
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -31,34 +66,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             <p className="text-base font-semibold">Annex Leather</p>
             <p className="text-xs text-white/60 mt-0.5">Enterprise ERP</p>
           </div>
-          <nav className="flex-1 overflow-y-auto py-3">
-            {visibleGroups.map((group) => (
-              <div key={group.label} className="px-3 pb-4">
-                <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/40">
-                  {group.label}
-                </p>
-                <ul className="mt-1 space-y-0.5">
-                  {group.items.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <li key={item.href}>
-                        <Link
-                          href={item.href}
-                          className={cn(
-                            'flex items-center gap-3 rounded-md px-2 py-2 text-sm text-white/80',
-                            'hover:bg-white/5 hover:text-white transition-colors',
-                          )}
-                        >
-                          <Icon className="h-4 w-4 shrink-0" />
-                          <span className="truncate">{item.label}</span>
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))}
-          </nav>
+          <SidebarNav modules={visibleModules} />
           <div className="border-t border-white/10 p-3 space-y-2">
             <div className="px-2 text-xs text-white/80">
               <p className="font-medium truncate">{session?.name ?? 'Guest'}</p>
@@ -89,9 +97,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
               </div>
             </div>
             <BranchSwitcher />
-            <button className="relative h-9 w-9 rounded-md border bg-background grid place-items-center">
-              <Bell className="h-4 w-4" />
-            </button>
+            {session && (await renderBell(session.permissions.includes('notifications:read')))}
             <div className="h-9 w-9 rounded-full bg-primary text-primary-foreground grid place-items-center text-xs font-semibold">
               {initials}
             </div>
