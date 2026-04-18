@@ -290,6 +290,211 @@ export const accountsService = {
     return map.accountId;
   },
 
+  async accountLedger(
+    session: AppSession | null,
+    filters: { accountId: string; branchId?: string; from?: Date; to?: Date },
+  ) {
+    await authorize(session, 'accounts:read');
+    const account = await prisma.chartAccount.findUnique({ where: { id: filters.accountId } });
+    if (!account) throw new NotFoundError('Account not found');
+
+    const lines = await prisma.journalEntryLine.findMany({
+      where: {
+        accountId: filters.accountId,
+        entry: {
+          status: 'POSTED',
+          branchId: filters.branchId,
+          date: { gte: filters.from, lte: filters.to },
+        },
+      },
+      include: { entry: { include: { branch: true } } },
+      orderBy: [{ entry: { date: 'asc' } }, { entry: { createdAt: 'asc' } }, { lineNo: 'asc' }],
+    });
+
+    let running =
+      account.normalSide === 'DEBIT' ? account.openingBalance : account.openingBalance.negated();
+    const rows = lines.map((l) => {
+      const delta = account.normalSide === 'DEBIT' ? l.debit.minus(l.credit) : l.credit.minus(l.debit);
+      running = running.plus(delta);
+      return {
+        id: l.id,
+        date: l.entry.date,
+        entryId: l.entryId,
+        number: l.entry.number,
+        branchCode: l.entry.branch.code,
+        memo: l.memo ?? l.entry.memo ?? '',
+        reference: l.entry.reference ?? '',
+        debit: l.debit,
+        credit: l.credit,
+        balance: running,
+      };
+    });
+
+    return { account, opening: account.openingBalance, rows, closing: running };
+  },
+
+  async listPeriods(session: AppSession | null, filters: { branchId?: string } = {}) {
+    await authorize(session, 'accounts:read');
+    return prisma.period.findMany({
+      where: { branchId: filters.branchId },
+      include: { branch: true, _count: { select: { journalEntries: true } } },
+      orderBy: [{ branchId: 'asc' }, { startsAt: 'desc' }],
+    });
+  },
+
+  async createPeriod(
+    session: AppSession | null,
+    input: { branchId: string; name: string; startsAt: Date; endsAt: Date },
+  ) {
+    const actor = await authorize(session, 'accounts:close-period');
+    if (input.endsAt <= input.startsAt) throw new ValidationError('End date must be after start date');
+    const overlap = await prisma.period.findFirst({
+      where: {
+        branchId: input.branchId,
+        startsAt: { lte: input.endsAt },
+        endsAt: { gte: input.startsAt },
+      },
+    });
+    if (overlap) throw new ValidationError(`Overlaps period "${overlap.name}"`);
+
+    return prisma.$transaction(async (tx) => {
+      const p = await tx.period.create({
+        data: { branchId: input.branchId, name: input.name, startsAt: input.startsAt, endsAt: input.endsAt },
+      });
+      await recordAudit(
+        {
+          actorId: actor.userId,
+          branchId: input.branchId,
+          module: 'accounts',
+          action: 'create-period',
+          entityType: 'Period',
+          entityId: p.id,
+          after: { name: p.name, startsAt: p.startsAt, endsAt: p.endsAt },
+        },
+        tx,
+      );
+      return p;
+    });
+  },
+
+  async setPeriodStatus(
+    session: AppSession | null,
+    input: { id: string; status: 'OPEN' | 'LOCKED' | 'CLOSED' },
+  ) {
+    const actor = await authorize(session, 'accounts:close-period');
+    return prisma.$transaction(async (tx) => {
+      const existing = await tx.period.findUnique({ where: { id: input.id } });
+      if (!existing) throw new NotFoundError('Period not found');
+      if (existing.status === 'CLOSED' && input.status !== 'CLOSED') {
+        throw new ValidationError('Closed periods cannot be reopened');
+      }
+      if (input.status === 'CLOSED') {
+        const drafts = await tx.journalEntry.count({
+          where: { periodId: input.id, status: 'DRAFT' },
+        });
+        if (drafts > 0) throw new ValidationError(`${drafts} draft entries must be posted or discarded first`);
+      }
+      const updated = await tx.period.update({
+        where: { id: input.id },
+        data: { status: input.status },
+      });
+      await recordAudit(
+        {
+          actorId: actor.userId,
+          branchId: existing.branchId,
+          module: 'accounts',
+          action: 'period-status',
+          entityType: 'Period',
+          entityId: existing.id,
+          before: { status: existing.status },
+          after: { status: updated.status },
+        },
+        tx,
+      );
+      return updated;
+    });
+  },
+
+  async balanceSheet(
+    session: AppSession | null,
+    filters: { branchId?: string; asOf?: Date } = {},
+  ) {
+    const tb = await this.trialBalance(session, filters);
+    const asset = tb.filter((r) => r.type === 'ASSET');
+    const liability = tb.filter((r) => r.type === 'LIABILITY');
+    const equity = tb.filter((r) => r.type === 'EQUITY');
+    const totalAsset = asset.reduce((s, r) => s.plus(r.balance), ZERO);
+    const totalLiability = liability.reduce((s, r) => s.plus(r.credit.minus(r.debit)), ZERO);
+    const totalEquity = equity.reduce((s, r) => s.plus(r.credit.minus(r.debit)), ZERO);
+    const income = tb
+      .filter((r) => r.type === 'INCOME')
+      .reduce((s, r) => s.plus(r.credit.minus(r.debit)), ZERO);
+    const expense = tb
+      .filter((r) => r.type === 'EXPENSE')
+      .reduce((s, r) => s.plus(r.debit.minus(r.credit)), ZERO);
+    const retained = income.minus(expense);
+    return {
+      asset,
+      liability,
+      equity,
+      totals: {
+        asset: totalAsset,
+        liability: totalLiability,
+        equity: totalEquity,
+        retained,
+        liabilityPlusEquity: totalLiability.plus(totalEquity).plus(retained),
+      },
+    };
+  },
+
+  async incomeStatement(
+    session: AppSession | null,
+    filters: { branchId?: string; from?: Date; to?: Date } = {},
+  ) {
+    await authorize(session, 'accounts:read');
+    const rows = await prisma.journalEntryLine.groupBy({
+      by: ['accountId'],
+      where: {
+        entry: {
+          status: 'POSTED',
+          branchId: filters.branchId,
+          date: { gte: filters.from, lte: filters.to },
+        },
+      },
+      _sum: { debit: true, credit: true },
+    });
+    const accounts = await prisma.chartAccount.findMany({
+      where: { id: { in: rows.map((r) => r.accountId) }, type: { in: ['INCOME', 'EXPENSE'] } },
+    });
+    const byId = new Map(accounts.map((a) => [a.id, a]));
+    const income: { id: string; code: string; name: string; amount: Prisma.Decimal }[] = [];
+    const expense: { id: string; code: string; name: string; amount: Prisma.Decimal }[] = [];
+    let totalIncome = ZERO;
+    let totalExpense = ZERO;
+    for (const r of rows) {
+      const acc = byId.get(r.accountId);
+      if (!acc) continue;
+      const d = r._sum.debit ?? ZERO;
+      const c = r._sum.credit ?? ZERO;
+      if (acc.type === 'INCOME') {
+        const amt = c.minus(d);
+        income.push({ id: acc.id, code: acc.code, name: acc.name, amount: amt });
+        totalIncome = totalIncome.plus(amt);
+      } else {
+        const amt = d.minus(c);
+        expense.push({ id: acc.id, code: acc.code, name: acc.name, amount: amt });
+        totalExpense = totalExpense.plus(amt);
+      }
+    }
+    income.sort((a, b) => a.code.localeCompare(b.code));
+    expense.sort((a, b) => a.code.localeCompare(b.code));
+    return {
+      income,
+      expense,
+      totals: { income: totalIncome, expense: totalExpense, net: totalIncome.minus(totalExpense) },
+    };
+  },
+
   async trialBalance(
     session: AppSession | null,
     filters: { branchId?: string; asOf?: Date } = {},

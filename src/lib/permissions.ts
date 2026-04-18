@@ -47,7 +47,16 @@ export const PERMISSIONS = {
   accounts: ['read', 'post', 'void', 'close-period'],
 
   // Phase 7
-  hr: ['read', 'write', 'process-payroll', 'lock-payroll'],
+  hr: [
+    'read',
+    'write',
+    'attendance',
+    'leave-approve',
+    'process-payroll',
+    'approve-payroll',
+    'pay-payroll',
+    'lock-payroll',
+  ],
   reports: ['read', 'export'],
   dashboard: ['read'],
 } as const;

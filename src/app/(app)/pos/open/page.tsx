@@ -37,7 +37,7 @@ export default async function OpenSessionPage() {
     <div className="space-y-6">
       <PageHeader title="Open Cash Session" description="Record the opening float to start selling." />
       <Card className="p-6 max-w-xl">
-        <form action={openPosSessionAction} className="space-y-4">
+        <form action={async (fd) => { 'use server'; await openPosSessionAction(fd); }} className="space-y-4">
           <div>
             <Label htmlFor="branchId">Branch</Label>
             <select

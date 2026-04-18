@@ -37,7 +37,7 @@ export default async function SessionsPage() {
                 Opened {open.openedAt.toLocaleString()} · Float {formatCurrency(open.openingFloat, 'BDT')}
               </div>
             </div>
-            <form action={closePosSessionAction} className="flex items-end gap-2">
+            <form action={async (fd) => { 'use server'; await closePosSessionAction(fd); }} className="flex items-end gap-2">
               <input type="hidden" name="sessionId" value={open.id} />
               <div>
                 <label className="text-xs text-muted-foreground block">Counted cash</label>

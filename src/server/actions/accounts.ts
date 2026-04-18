@@ -7,6 +7,8 @@ import { accountsService } from '@/server/services/accounts.service';
 import {
   journalCreateSchema,
   journalVoidSchema,
+  periodCreateSchema,
+  periodStatusSchema,
   type JournalCreateInput,
 } from '@/server/validators/accounts';
 import { ApiError } from '@/lib/errors';
@@ -73,4 +75,48 @@ export async function voidEntryAction(formData: FormData) {
   revalidatePath('/accounts/journals');
   revalidatePath(`/accounts/journals/${parsed.data.id}`);
   redirect(`/accounts/journals/${parsed.data.id}`);
+}
+
+export type PeriodFormState =
+  | { error?: string; fieldErrors?: Record<string, string[]>; success?: boolean }
+  | undefined;
+
+export async function createPeriodAction(
+  _prev: PeriodFormState,
+  formData: FormData,
+): Promise<PeriodFormState> {
+  const parsed = periodCreateSchema.safeParse({
+    branchId: formData.get('branchId'),
+    name: formData.get('name'),
+    startsAt: formData.get('startsAt'),
+    endsAt: formData.get('endsAt'),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message, fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+  try {
+    const session = await getSession();
+    await accountsService.createPeriod(session, parsed.data);
+  } catch (e) {
+    if (e instanceof ApiError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath('/accounts/periods');
+  return { success: true };
+}
+
+export async function setPeriodStatusAction(formData: FormData) {
+  const parsed = periodStatusSchema.safeParse({
+    id: formData.get('id'),
+    status: formData.get('status'),
+  });
+  if (!parsed.success) return;
+  const session = await getSession();
+  try {
+    await accountsService.setPeriodStatus(session, parsed.data);
+  } catch (e) {
+    if (e instanceof ApiError) return;
+    throw e;
+  }
+  revalidatePath('/accounts/periods');
 }

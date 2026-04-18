@@ -37,6 +37,22 @@ export const journalVoidSchema = z.object({
   reason: z.string().trim().min(3).max(500),
 });
 
+export const periodCreateSchema = z
+  .object({
+    branchId: z.string().cuid(),
+    name: z.string().trim().min(1).max(64),
+    startsAt: z.coerce.date(),
+    endsAt: z.coerce.date(),
+  })
+  .refine((v) => v.endsAt > v.startsAt, { message: 'End date must be after start date' });
+
+export const periodStatusSchema = z.object({
+  id: z.string().cuid(),
+  status: z.enum(['OPEN', 'LOCKED', 'CLOSED']),
+});
+
 export type JournalLineInput = z.infer<typeof journalLineSchema>;
 export type JournalCreateInput = z.infer<typeof journalCreateSchema>;
 export type JournalVoidInput = z.infer<typeof journalVoidSchema>;
+export type PeriodCreateInput = z.infer<typeof periodCreateSchema>;
+export type PeriodStatusInput = z.infer<typeof periodStatusSchema>;

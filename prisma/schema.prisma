@@ -389,6 +389,8 @@ model Branch {
   corporateInvoices   CorporateInvoice[]
   chartAccounts       ChartAccount[]
   journalEntries      JournalEntry[]
+  employees           Employee[]
+  payrollRuns         PayrollRun[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1996,4 +1998,191 @@ model JournalEntryLine {
 
   @@index([entryId])
   @@index([accountId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HR & Payroll
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum EmploymentStatus {
+  ACTIVE
+  ON_LEAVE
+  TERMINATED
+  RESIGNED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+  ON_LEAVE
+  HOLIDAY
+}
+
+enum LeaveType {
+  CASUAL
+  SICK
+  EARNED
+  UNPAID
+  MATERNITY
+  OTHER
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum PayrollRunStatus {
+  DRAFT
+  APPROVED
+  PAID
+  LOCKED
+  CANCELLED
+}
+
+model Employee {
+  id           String           @id @default(cuid())
+  branchId     String
+  branch       Branch           @relation(fields: [branchId], references: [id])
+  code         String           @unique
+  firstName    String
+  lastName     String
+  email        String?          @unique
+  phone        String?
+  designation  String?
+  department   String?
+  joinedAt     DateTime
+  leftAt       DateTime?
+  status       EmploymentStatus @default(ACTIVE)
+
+  basicSalary        Decimal @default(0) @db.Decimal(18, 2)
+  houseAllowance     Decimal @default(0) @db.Decimal(18, 2)
+  transportAllowance Decimal @default(0) @db.Decimal(18, 2)
+  medicalAllowance   Decimal @default(0) @db.Decimal(18, 2)
+  otherAllowance     Decimal @default(0) @db.Decimal(18, 2)
+  providentFund      Decimal @default(0) @db.Decimal(18, 2)
+  taxDeduction       Decimal @default(0) @db.Decimal(18, 2)
+
+  bankName    String?
+  bankAccount String?
+
+  attendance   AttendanceRecord[]
+  leaves       LeaveRequest[]
+  payslips     Payslip[]
+
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([branchId, status])
+  @@index([department])
+}
+
+model AttendanceRecord {
+  id         String           @id @default(cuid())
+  employeeId String
+  employee   Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date       DateTime         @db.Date
+  checkIn    DateTime?
+  checkOut   DateTime?
+  status     AttendanceStatus @default(PRESENT)
+  remarks    String?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([employeeId, date])
+  @@index([date])
+}
+
+model LeaveRequest {
+  id         String      @id @default(cuid())
+  employeeId String
+  employee   Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type       LeaveType
+  fromDate   DateTime    @db.Date
+  toDate     DateTime    @db.Date
+  days       Int
+  reason     String?
+  status     LeaveStatus @default(PENDING)
+
+  decidedById String?
+  decidedAt   DateTime?
+  decisionNote String?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([employeeId, status])
+  @@index([fromDate, toDate])
+}
+
+model PayrollRun {
+  id       String           @id @default(cuid())
+  branchId String
+  branch   Branch           @relation(fields: [branchId], references: [id])
+  /// YYYY-MM — e.g. "2026-04"
+  period   String
+  status   PayrollRunStatus @default(DRAFT)
+  notes    String?
+
+  totalGross     Decimal @default(0) @db.Decimal(18, 2)
+  totalDeduction Decimal @default(0) @db.Decimal(18, 2)
+  totalNet       Decimal @default(0) @db.Decimal(18, 2)
+
+  payslips Payslip[]
+
+  journalEntryId String? @unique
+
+  createdById  String?
+  approvedById String?
+  approvedAt   DateTime?
+  paidById     String?
+  paidAt       DateTime?
+  lockedById   String?
+  lockedAt     DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([branchId, period])
+  @@index([status])
+}
+
+model Payslip {
+  id           String     @id @default(cuid())
+  payrollRunId String
+  payrollRun   PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  employeeId   String
+  employee     Employee   @relation(fields: [employeeId], references: [id])
+
+  workedDays   Int
+  leaveDays    Int     @default(0)
+  absentDays   Int     @default(0)
+
+  basic              Decimal @db.Decimal(18, 2)
+  houseAllowance     Decimal @default(0) @db.Decimal(18, 2)
+  transportAllowance Decimal @default(0) @db.Decimal(18, 2)
+  medicalAllowance   Decimal @default(0) @db.Decimal(18, 2)
+  otherAllowance     Decimal @default(0) @db.Decimal(18, 2)
+  bonus              Decimal @default(0) @db.Decimal(18, 2)
+
+  providentFund      Decimal @default(0) @db.Decimal(18, 2)
+  taxDeduction       Decimal @default(0) @db.Decimal(18, 2)
+  otherDeduction     Decimal @default(0) @db.Decimal(18, 2)
+
+  gross Decimal @db.Decimal(18, 2)
+  net   Decimal @db.Decimal(18, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([payrollRunId, employeeId])
+  @@index([employeeId])
 }

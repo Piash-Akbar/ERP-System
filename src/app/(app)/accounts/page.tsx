@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Plus, BookOpen, ListChecks, BarChart3 } from 'lucide-react';
+import { Plus, BookOpen, ListChecks, BarChart3, TrendingUp, Scale, Lock } from 'lucide-react';
 import { getSession } from '@/server/auth/session';
 import { accountsService } from '@/server/services/accounts.service';
 import { PageHeader } from '@/components/shared/page-header';
@@ -33,12 +33,18 @@ export default async function AccountsOverviewPage() {
         )}
       </PageHeader>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <NavCard
           icon={<ListChecks className="h-5 w-5 text-primary" />}
           title="Journals"
           subtitle="Manual & system-generated entries"
           href="/accounts/journals"
+        />
+        <NavCard
+          icon={<BookOpen className="h-5 w-5 text-primary" />}
+          title="Account ledger"
+          subtitle="Per-account transaction history"
+          href="/accounts/ledger"
         />
         <NavCard
           icon={<BarChart3 className="h-5 w-5 text-primary" />}
@@ -47,10 +53,22 @@ export default async function AccountsOverviewPage() {
           href="/accounts/trial-balance"
         />
         <NavCard
-          icon={<BookOpen className="h-5 w-5 text-primary" />}
-          title="Chart of accounts"
-          subtitle="Ledger account structure"
-          href="/coa"
+          icon={<Scale className="h-5 w-5 text-primary" />}
+          title="Balance sheet"
+          subtitle="Assets vs. liabilities + equity"
+          href="/accounts/balance-sheet"
+        />
+        <NavCard
+          icon={<TrendingUp className="h-5 w-5 text-primary" />}
+          title="Income statement"
+          subtitle="Revenue, expenses, net profit"
+          href="/accounts/income-statement"
+        />
+        <NavCard
+          icon={<Lock className="h-5 w-5 text-primary" />}
+          title="Fiscal periods"
+          subtitle="Lock & close accounting periods"
+          href="/accounts/periods"
         />
       </div>
 

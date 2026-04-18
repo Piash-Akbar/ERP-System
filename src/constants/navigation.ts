@@ -155,7 +155,11 @@ export const MODULES: NavModule[] = [
       { label: 'Overview', href: '/accounts', permission: 'accounts:read' },
       { label: 'Journals', href: '/accounts/journals', permission: 'accounts:read' },
       { label: 'New journal', href: '/accounts/journals/new', permission: 'accounts:post' },
+      { label: 'Account ledger', href: '/accounts/ledger', permission: 'accounts:read' },
       { label: 'Trial balance', href: '/accounts/trial-balance', permission: 'accounts:read' },
+      { label: 'Balance sheet', href: '/accounts/balance-sheet', permission: 'accounts:read' },
+      { label: 'Income statement', href: '/accounts/income-statement', permission: 'accounts:read' },
+      { label: 'Fiscal periods', href: '/accounts/periods', permission: 'accounts:read' },
     ],
   },
   {
@@ -182,6 +186,14 @@ export const MODULES: NavModule[] = [
     href: '/reports',
     iconName: 'BarChart3',
     permission: 'reports:read',
+    items: [
+      { label: 'Overview', href: '/reports', permission: 'reports:read' },
+      { label: 'Sales', href: '/reports/sales', permission: 'reports:read' },
+      { label: 'Top products', href: '/reports/top-products', permission: 'reports:read' },
+      { label: 'Purchase', href: '/reports/purchase', permission: 'reports:read' },
+      { label: 'Inventory valuation', href: '/reports/inventory', permission: 'reports:read' },
+      { label: 'HR summary', href: '/reports/hr', permission: 'reports:read' },
+    ],
   },
   {
     number: 17,
@@ -253,5 +265,13 @@ export const MODULES: NavModule[] = [
     href: '/hr',
     iconName: 'UsersRound',
     permission: 'hr:read',
+    items: [
+      { label: 'Overview', href: '/hr', permission: 'hr:read' },
+      { label: 'Employees', href: '/hr/employees', permission: 'hr:read' },
+      { label: 'New employee', href: '/hr/employees/new', permission: 'hr:write' },
+      { label: 'Attendance', href: '/hr/attendance', permission: 'hr:read' },
+      { label: 'Leaves', href: '/hr/leaves', permission: 'hr:read' },
+      { label: 'Payroll', href: '/hr/payroll', permission: 'hr:read' },
+    ],
   },
 ];
