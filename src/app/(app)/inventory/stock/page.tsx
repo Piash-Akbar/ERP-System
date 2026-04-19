@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight } from 'lucide-react';
+import type { Prisma } from '@prisma/client';
 import { getSession } from '@/server/auth/session';
 import { stockService } from '@/server/services/stock.service';
 import { warehouseService } from '@/server/services/warehouse.service';
@@ -9,6 +10,17 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
 export const metadata = { title: 'Stock balance' };
+
+type Product = {
+  id: string;
+  sku: string;
+  name: string;
+  unit: string;
+  type: import('@prisma/client').ProductType;
+  reorderLevel: Prisma.Decimal;
+};
+type Warehouse = { id: string; name: string; code: string };
+type Row = { product: Product; warehouse: Warehouse; qty: Prisma.Decimal };
 
 export default async function StockBalancePage() {
   const session = await getSession();
@@ -30,26 +42,31 @@ export default async function StockBalancePage() {
     warehouseService.listActiveForBranch(session, branchId),
     prisma.product.findMany({
       orderBy: { name: 'asc' },
-      select: { id: true, sku: true, name: true, unit: true, reorderLevel: true },
+      select: { id: true, sku: true, name: true, unit: true, reorderLevel: true, type: true },
     }),
   ]);
 
   const whById = new Map(warehouses.map((w) => [w.id, w]));
   const prodById = new Map(products.map((p) => [p.id, p]));
 
-  // Rows sorted by product then warehouse
-  const rows = balances
-    .map((b) => ({
-      product: prodById.get(b.productId),
-      warehouse: whById.get(b.warehouseId),
-      qty: b.balance,
-    }))
-    .filter((r) => r.product && r.warehouse)
-    .sort((a, b) => {
-      const pa = a.product!.name.localeCompare(b.product!.name);
-      if (pa !== 0) return pa;
-      return a.warehouse!.name.localeCompare(b.warehouse!.name);
-    });
+  const allRows: Row[] = [];
+  for (const b of balances) {
+    const product = prodById.get(b.productId);
+    const warehouse = whById.get(b.warehouseId);
+    if (!product || !warehouse) continue;
+    allRows.push({ product, warehouse: { id: warehouse.id, name: warehouse.name, code: warehouse.code }, qty: b.balance });
+  }
+  allRows.sort((a, b) => {
+    const pa = a.product.name.localeCompare(b.product.name);
+    if (pa !== 0) return pa;
+    return a.warehouse.name.localeCompare(b.warehouse.name);
+  });
+
+  const finishedRows = allRows.filter((r) => r.product.type === 'FINISHED_GOOD');
+  const rawRows = allRows.filter((r) => r.product.type === 'RAW_MATERIAL');
+  const otherRows = allRows.filter(
+    (r) => r.product.type !== 'FINISHED_GOOD' && r.product.type !== 'RAW_MATERIAL',
+  );
 
   return (
     <div>
@@ -74,6 +91,54 @@ export default async function StockBalancePage() {
         </Button>
       </PageHeader>
 
+      <div className="space-y-6">
+        <StockSection
+          title="Finished products"
+          description="Sellable finished goods produced in the factory or received for resale."
+          rows={finishedRows}
+          emptyLabel="No finished-goods stock yet."
+        />
+        <StockSection
+          title="Raw materials"
+          description="Materials and inputs consumed in production."
+          rows={rawRows}
+          emptyLabel="No raw-material stock yet."
+        />
+        {otherRows.length > 0 && (
+          <StockSection
+            title="Other"
+            description="Work-in-progress, consumables, and other stock items."
+            rows={otherRows}
+            emptyLabel="No other stock."
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StockSection({
+  title,
+  description,
+  rows,
+  emptyLabel,
+}: {
+  title: string;
+  description: string;
+  rows: Row[];
+  emptyLabel: string;
+}) {
+  return (
+    <section>
+      <div className="mb-3 flex items-baseline justify-between">
+        <div>
+          <h2 className="text-base font-semibold">{title}</h2>
+          <p className="text-xs text-muted-foreground">{description}</p>
+        </div>
+        <span className="text-xs text-muted-foreground">
+          {rows.length} {rows.length === 1 ? 'row' : 'rows'}
+        </span>
+      </div>
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -90,32 +155,31 @@ export default async function StockBalancePage() {
             <tbody className="divide-y">
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
-                    No stock movements yet. Post a receipt to see balances.
+                  <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                    {emptyLabel}
                   </td>
                 </tr>
               )}
               {rows.map((r) => {
                 const low =
-                  r.product!.reorderLevel.gt(0) && r.qty.lte(r.product!.reorderLevel)
+                  r.product.reorderLevel.gt(0) && r.qty.lte(r.product.reorderLevel)
                     ? 'text-warning'
                     : r.qty.lte(0)
                       ? 'text-destructive'
                       : '';
                 return (
-                  <tr key={`${r.product!.id}-${r.warehouse!.id}`} className="hover:bg-muted/30">
-                    <td className="px-4 py-3 font-mono text-xs">{r.product!.sku}</td>
-                    <td className="px-4 py-3 font-medium">{r.product!.name}</td>
+                  <tr key={`${r.product.id}-${r.warehouse.id}`} className="hover:bg-muted/30">
+                    <td className="px-4 py-3 font-mono text-xs">{r.product.sku}</td>
+                    <td className="px-4 py-3 font-medium">{r.product.name}</td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {r.warehouse!.name}{' '}
-                      <span className="text-xs">({r.warehouse!.code})</span>
+                      {r.warehouse.name} <span className="text-xs">({r.warehouse.code})</span>
                     </td>
                     <td className={`px-4 py-3 text-right tabular font-semibold ${low}`}>
                       {r.qty.toString()}
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">{r.product!.unit}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{r.product.unit}</td>
                     <td className="px-4 py-3 text-right tabular text-muted-foreground">
-                      {r.product!.reorderLevel.gt(0) ? r.product!.reorderLevel.toString() : '—'}
+                      {r.product.reorderLevel.gt(0) ? r.product.reorderLevel.toString() : '—'}
                     </td>
                   </tr>
                 );
@@ -124,6 +188,6 @@ export default async function StockBalancePage() {
           </table>
         </div>
       </Card>
-    </div>
+    </section>
   );
 }

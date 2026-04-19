@@ -34,7 +34,7 @@ export default async function SessionsPage() {
               <div className="text-xs text-muted-foreground">Open session</div>
               <div className="font-medium">{open.warehouse.code} — {open.warehouse.name}</div>
               <div className="text-xs text-muted-foreground mt-1">
-                Opened {open.openedAt.toLocaleString()} · Float {formatCurrency(open.openingFloat, 'BDT')}
+                Opened {open.openedAt.toLocaleString()} · Opening balance {formatCurrency(open.openingFloat, 'BDT')}
               </div>
             </div>
             <form action={async (fd) => { 'use server'; await closePosSessionAction(fd); }} className="flex items-end gap-2">
@@ -74,7 +74,7 @@ export default async function SessionsPage() {
             { key: 'warehouse', header: 'Till', cell: (r) => `${r.warehouse.code} · ${r.warehouse.name}` },
             {
               key: 'float',
-              header: 'Float',
+              header: 'Opening balance',
               align: 'right',
               cell: (r) => <span className="tabular">{formatCurrency(r.openingFloat, 'BDT')}</span>,
             },

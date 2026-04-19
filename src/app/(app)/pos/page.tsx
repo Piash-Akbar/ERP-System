@@ -39,7 +39,7 @@ export default async function PosPage() {
             <div className="flex-1">
               <h2 className="font-semibold text-lg">No open session</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Cash sessions track opening float, cash tendered, and end-of-day
+                Cash sessions track opening balance, cash tendered, and end-of-day
                 variance. Open one to begin checkout.
               </p>
               <div className="flex gap-2 mt-4">

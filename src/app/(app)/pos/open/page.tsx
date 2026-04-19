@@ -33,9 +33,16 @@ export default async function OpenSessionPage() {
 
   const defaultBranch = session.activeBranchId ?? branches[0]?.id ?? '';
 
+  const lastClosed = await prisma.posSession.findFirst({
+    where: { cashierId: session.userId, status: 'CLOSED' },
+    orderBy: { closedAt: 'desc' },
+    select: { countedCash: true },
+  });
+  const defaultOpeningBalance = lastClosed ? lastClosed.countedCash.toString() : '0';
+
   return (
     <div className="space-y-6">
-      <PageHeader title="Open Cash Session" description="Record the opening float to start selling." />
+      <PageHeader title="Open Cash Session" description="Record the opening balance to start selling." />
       <Card className="p-6 max-w-xl">
         <form action={async (fd) => { 'use server'; await openPosSessionAction(fd); }} className="space-y-4">
           <div>
@@ -70,8 +77,20 @@ export default async function OpenSessionPage() {
             </select>
           </div>
           <div>
-            <Label htmlFor="openingFloat">Opening float</Label>
-            <Input id="openingFloat" name="openingFloat" type="number" min={0} step="any" defaultValue="0" />
+            <Label htmlFor="openingFloat">Opening balance</Label>
+            <Input
+              id="openingFloat"
+              name="openingFloat"
+              type="number"
+              min={0}
+              step="any"
+              defaultValue={defaultOpeningBalance}
+            />
+            {lastClosed && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Carried from previous session&apos;s counted cash.
+              </p>
+            )}
           </div>
           <div>
             <Label htmlFor="notes">Notes</Label>
