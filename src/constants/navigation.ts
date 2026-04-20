@@ -122,6 +122,15 @@ export const MODULES: NavModule[] = [
     href: '/trade',
     iconName: 'Ship',
     permission: 'trade:read',
+    items: [
+      { label: 'Overview', href: '/trade', permission: 'trade:read' },
+      { label: 'Orders', href: '/trade/orders', permission: 'trade:read' },
+      { label: 'New order', href: '/trade/orders/new', permission: 'trade:write' },
+      { label: 'Letters of Credit', href: '/trade/lc', permission: 'trade:read' },
+      { label: 'New LC', href: '/trade/lc/new', permission: 'trade:write' },
+      { label: 'Shipments', href: '/trade/shipments', permission: 'trade:read' },
+      { label: 'Payments', href: '/trade/payments', permission: 'trade:read' },
+    ],
   },
   {
     number: 11,

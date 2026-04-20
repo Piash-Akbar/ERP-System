@@ -100,6 +100,84 @@ enum PurchaseRequisitionStatus {
   CLOSED
 }
 
+// ── Trade / Export-Import ────────────────────────────────────────────────────
+
+enum TradeOrderType {
+  EXPORT
+  IMPORT
+}
+
+enum TradeOrderStatus {
+  DRAFT
+  CONFIRMED
+  IN_PRODUCTION
+  READY_TO_SHIP
+  SHIPPED
+  AT_CUSTOMS
+  DELIVERED
+  COMPLETED
+  CANCELLED
+}
+
+enum TradeShipmentStatus {
+  PENDING
+  BOOKING_CONFIRMED
+  IN_TRANSIT
+  AT_PORT
+  CUSTOMS_CLEARANCE
+  DELIVERED
+  CANCELLED
+}
+
+enum LCType {
+  SIGHT
+  USANCE
+  RED_CLAUSE
+  REVOLVING
+  STANDBY
+  TRANSFERABLE
+}
+
+enum LCStatus {
+  DRAFT
+  ISSUED
+  ADVISED
+  CONFIRMED
+  ACTIVE
+  AMENDED
+  PARTIALLY_UTILIZED
+  FULLY_UTILIZED
+  EXPIRED
+  CLOSED
+  CANCELLED
+}
+
+enum LCPaymentMode {
+  AT_SIGHT
+  USANCE_30
+  USANCE_60
+  USANCE_90
+  USANCE_120
+  USANCE_180
+  DEFERRED
+}
+
+enum LCDrawdownStatus {
+  DRAFT
+  DOCUMENTS_SUBMITTED
+  DOCUMENTS_ACCEPTED
+  PAYMENT_RECEIVED
+  REJECTED
+  CANCELLED
+}
+
+enum TradePaymentStatus {
+  PENDING
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+}
+
 enum PurchasePriority {
   LOW
   MEDIUM
@@ -391,6 +469,9 @@ model Branch {
   journalEntries      JournalEntry[]
   employees           Employee[]
   payrollRuns         PayrollRun[]
+  tradeOrders         TradeOrder[]
+  lettersOfCredit     LetterOfCredit[]
+  tradePayments       TradePayment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -534,6 +615,7 @@ model Product {
   corpOrderItems     CorporateOrderItem[]
   corpDeliveryItems  CorporateDeliveryItem[]
   corpInvoiceItems   CorporateInvoiceItem[]
+  tradeOrderItems    TradeOrderItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -631,6 +713,7 @@ model Supplier {
   purchaseInvoices PurchaseInvoice[]
   payments         SupplierPayment[]
   ledger           SupplierLedger[]
+  tradeOrders      TradeOrder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1249,6 +1332,7 @@ model Customer {
   corporateQuotes   CorporateQuote[]
   corporateOrders   CorporateOrder[]
   corporateInvoices CorporateInvoice[]
+  tradeOrders       TradeOrder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2185,4 +2269,276 @@ model Payslip {
 
   @@unique([payrollRunId, employeeId])
   @@index([employeeId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Trade / Export-Import
+// ─────────────────────────────────────────────────────────────────────────────
+
+model TradeOrder {
+  id       String           @id @default(cuid())
+  number   String           @unique
+  branchId String
+  branch   Branch           @relation(fields: [branchId], references: [id])
+
+  type   TradeOrderType
+  status TradeOrderStatus @default(DRAFT)
+
+  // Counter-party — for EXPORT: customer; for IMPORT: supplier (one of these is set)
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+  supplierId String?
+  supplier   Supplier? @relation(fields: [supplierId], references: [id])
+
+  // Contract / order basics
+  contractRef     String?
+  currency        CurrencyCode @default(USD)
+  totalValue      Decimal      @default(0) @db.Decimal(18, 4)
+  exchangeRate    Decimal      @default(1) @db.Decimal(18, 6)
+  localValue      Decimal      @default(0) @db.Decimal(18, 4)
+
+  // Ports / incoterms
+  portOfLoading    String?
+  portOfDischarge  String?
+  incoterms        String?          // FOB, CIF, EXW, etc.
+  latestShipDate   DateTime?        @db.Date
+  expectedArrival  DateTime?        @db.Date
+
+  // Goods description
+  goodsDescription String?
+
+  notes       String?
+
+  items     TradeOrderItem[]
+  shipments TradeShipment[]
+  lc        LetterOfCredit?
+  payments  TradePayment[]
+
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([branchId, status])
+  @@index([branchId, type])
+  @@index([createdAt])
+}
+
+model TradeOrderItem {
+  id           String     @id @default(cuid())
+  tradeOrderId String
+  tradeOrder   TradeOrder @relation(fields: [tradeOrderId], references: [id], onDelete: Cascade)
+
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id])
+  description String
+  hsCode      String?
+  quantity    Decimal  @db.Decimal(18, 4)
+  unit        String   @default("PCS")
+  unitPrice   Decimal  @db.Decimal(18, 4)
+  lineTotal   Decimal  @db.Decimal(18, 4)
+
+  @@index([tradeOrderId])
+}
+
+model TradeShipment {
+  id           String              @id @default(cuid())
+  tradeOrderId String
+  tradeOrder   TradeOrder          @relation(fields: [tradeOrderId], references: [id], onDelete: Restrict)
+  status       TradeShipmentStatus @default(PENDING)
+  sequence     Int                 @default(1)
+
+  // Carrier / vessel info
+  carrierName    String?
+  vesselName     String?
+  voyageNumber   String?
+  blNumber       String?           // Bill of Lading number
+  blDate         DateTime?         @db.Date
+  bookingRef     String?
+
+  portOfLoading   String?
+  portOfDischarge String?
+  etd             DateTime?        @db.Date // estimated departure
+  eta             DateTime?        @db.Date // estimated arrival
+  actualDeparture DateTime?        @db.Date
+  actualArrival   DateTime?        @db.Date
+
+  containerNumbers String?         // comma-separated if multiple
+  sealNumbers      String?
+  grossWeight      Decimal?        @db.Decimal(18, 4)
+  netWeight        Decimal?        @db.Decimal(18, 4)
+  volume           Decimal?        @db.Decimal(18, 4)
+  packages         Int?
+
+  freightCost     Decimal? @db.Decimal(18, 4)
+  insuranceCost   Decimal? @db.Decimal(18, 4)
+
+  notes       String?
+  customsClearedAt DateTime?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tradeOrderId, status])
+}
+
+model LetterOfCredit {
+  id           String     @id @default(cuid())
+  number       String     @unique
+  tradeOrderId String     @unique
+  tradeOrder   TradeOrder @relation(fields: [tradeOrderId], references: [id], onDelete: Restrict)
+  branchId     String
+  branch       Branch     @relation(fields: [branchId], references: [id])
+
+  type        LCType        @default(SIGHT)
+  status      LCStatus      @default(DRAFT)
+  paymentMode LCPaymentMode @default(AT_SIGHT)
+
+  // Parties
+  applicantName    String             // importer / buyer name
+  beneficiaryName  String             // exporter / seller name
+  issuingBank      String
+  issuingBankSwift String?
+  advisingBank     String?
+  advisingBankSwift String?
+  confirmingBank   String?
+
+  // Amounts
+  currency       CurrencyCode @default(USD)
+  lcAmount       Decimal      @db.Decimal(18, 4)
+  tolerancePlus  Decimal      @default(0) @db.Decimal(5, 2)  // % above allowed
+  toleranceMinus Decimal      @default(0) @db.Decimal(5, 2)  // % below allowed
+  utilizedAmount Decimal      @default(0) @db.Decimal(18, 4)
+  availableAmount Decimal     @default(0) @db.Decimal(18, 4)
+
+  // Dates
+  issueDate        DateTime  @db.Date
+  expiryDate       DateTime  @db.Date
+  expiryPlace      String?
+  latestShipDate   DateTime? @db.Date
+  presentationDays Int       @default(21)   // days after BL date for doc presentation
+
+  // Terms
+  partialShipment    Boolean @default(false)
+  transhipmentAllowed Boolean @default(false)
+  portOfLoading      String?
+  portOfDischarge    String?
+  goodsDescription   String?
+  specialConditions  String?
+
+  // SWIFT reference
+  swiftMt700Ref String?
+
+  amendments LCAmendment[]
+  drawdowns  LCDrawdown[]
+
+  issuedById String?
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([branchId, status])
+  @@index([expiryDate])
+}
+
+model LCAmendment {
+  id   String         @id @default(cuid())
+  lcId String
+  lc   LetterOfCredit @relation(fields: [lcId], references: [id], onDelete: Restrict)
+
+  amendmentNumber Int
+  status          ApprovalStatus @default(PENDING)
+
+  // Fields that can be amended (null = unchanged)
+  newExpiryDate      DateTime? @db.Date
+  newLcAmount        Decimal?  @db.Decimal(18, 4)
+  newLatestShipDate  DateTime? @db.Date
+  newSpecialConditions String?
+
+  reason        String
+  requestedById String?
+  approvedById  String?
+  approvedAt    DateTime?
+  rejectedById  String?
+  rejectionNote String?
+
+  swiftMt707Ref String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([lcId, amendmentNumber])
+  @@index([lcId, status])
+}
+
+model LCDrawdown {
+  id   String         @id @default(cuid())
+  lcId String
+  lc   LetterOfCredit @relation(fields: [lcId], references: [id], onDelete: Restrict)
+
+  drawdownNumber Int
+  status         LCDrawdownStatus @default(DRAFT)
+
+  // Presentation
+  presentationDate DateTime  @db.Date
+  documentsDueBy   DateTime? @db.Date
+  amount           Decimal   @db.Decimal(18, 4)
+
+  // Documents presented
+  commercialInvoiceRef String?
+  blRef                String?
+  packingListRef       String?
+  certificateOfOrigin  Boolean @default(false)
+  inspectionCert       Boolean @default(false)
+  otherDocs            String?
+
+  // Settlement
+  paymentDueDate  DateTime? @db.Date
+  paymentReceivedAt DateTime? @db.Date
+  bankCharges     Decimal  @default(0) @db.Decimal(18, 4)
+  notes           String?
+
+  discrepancyNote String?
+  rejectionReason String?
+
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([lcId, drawdownNumber])
+  @@index([lcId, status])
+}
+
+model TradePayment {
+  id           String             @id @default(cuid())
+  number       String             @unique
+  tradeOrderId String
+  tradeOrder   TradeOrder         @relation(fields: [tradeOrderId], references: [id], onDelete: Restrict)
+  branchId     String
+  branch       Branch             @relation(fields: [branchId], references: [id])
+
+  status TradePaymentStatus @default(PENDING)
+
+  currency     CurrencyCode @default(USD)
+  amount       Decimal      @db.Decimal(18, 4)
+  exchangeRate Decimal      @db.Decimal(18, 6)
+  localAmount  Decimal      @db.Decimal(18, 4)
+
+  bankName      String?
+  bankReference String?
+  swiftRef      String?
+  paymentDate   DateTime? @db.Date
+  valueDate     DateTime? @db.Date
+
+  notes String?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tradeOrderId])
+  @@index([branchId, status])
 }

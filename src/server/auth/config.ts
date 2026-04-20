@@ -24,34 +24,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const user = await prisma.user.findUnique({
           where: { email: parsed.data.email },
-          include: {
-            roles: {
-              include: {
-                role: {
-                  include: { permissions: { include: { permission: true } } },
-                },
-              },
-            },
-          },
+          select: { id: true, email: true, name: true, passwordHash: true, status: true, defaultBranchId: true },
         });
 
         if (!user || user.status !== 'ACTIVE') return null;
         const ok = await bcrypt.compare(parsed.data.password, user.passwordHash);
         if (!ok) return null;
 
-        const permSet = new Set<string>();
-        const roleNames: string[] = [];
-        for (const ur of user.roles) {
-          roleNames.push(ur.role.name);
-          for (const rp of ur.role.permissions) permSet.add(rp.permission.key);
-        }
-
         return {
           id: user.id,
           email: user.email,
           name: user.name,
-          roles: roleNames,
-          permissions: [...permSet],
           activeBranchId: user.defaultBranchId ?? null,
         };
       },

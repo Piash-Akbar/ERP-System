@@ -4,27 +4,23 @@ declare module 'next-auth' {
   interface Session {
     user: {
       id: string;
-      roles: string[];
-      permissions: string[];
       activeBranchId: string | null;
     } & DefaultSession['user'];
   }
 
   interface User {
-    roles?: string[];
-    permissions?: string[];
     activeBranchId?: string | null;
   }
 }
 
 interface AppToken {
   id?: string;
-  roles?: string[];
-  permissions?: string[];
   activeBranchId?: string | null;
   [key: string]: unknown;
 }
 
+// Roles and permissions are NOT stored in the JWT — they are loaded fresh from
+// the DB in getSession() to avoid cookie size limits and stale permission issues.
 export const authConfig = {
   session: { strategy: 'jwt' },
   pages: { signIn: '/login' },
@@ -35,8 +31,6 @@ export const authConfig = {
       const t = token as AppToken;
       if (user) {
         t.id = user.id as string;
-        t.roles = user.roles ?? [];
-        t.permissions = user.permissions ?? [];
         t.activeBranchId = user.activeBranchId ?? null;
       }
       return t;
@@ -44,8 +38,6 @@ export const authConfig = {
     async session({ session, token }) {
       const t = token as AppToken;
       if (t.id) session.user.id = t.id;
-      session.user.roles = t.roles ?? [];
-      session.user.permissions = t.permissions ?? [];
       session.user.activeBranchId = t.activeBranchId ?? null;
       return session;
     },

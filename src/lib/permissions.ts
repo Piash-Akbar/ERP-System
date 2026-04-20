@@ -40,7 +40,7 @@ export const PERMISSIONS = {
     'discount-override',
   ],
   ecommerce: ['read', 'fulfill', 'refund'],
-  trade: ['read', 'write'],
+  trade: ['read', 'write', 'lc-issue', 'lc-amend', 'lc-drawdown', 'shipment', 'payment'],
 
   // Phase 6
   coa: ['read', 'write'],
