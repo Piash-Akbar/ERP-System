@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { FileText, Upload } from 'lucide-react';
+import { FileText, Settings, Upload } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -43,6 +43,11 @@ export default async function DocumentsPage({
         title="Documents"
         description="Central document repository — linked to any entity via tags"
       >
+        <Button variant="outline" asChild>
+          <Link href="/documents/settings">
+            <Settings className="h-4 w-4" /> Storage
+          </Link>
+        </Button>
         <Button variant="dark" asChild>
           <Link href="/documents/new">
             <Upload className="h-4 w-4" /> Upload

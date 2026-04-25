@@ -59,6 +59,7 @@ export const PERMISSIONS = {
   ],
   reports: ['read', 'export'],
   dashboard: ['read'],
+  settings: ['read', 'write'],
 } as const;
 
 export type PermissionModule = keyof typeof PERMISSIONS;

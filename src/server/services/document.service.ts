@@ -4,7 +4,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/server/db';
 import { authorize } from '@/server/auth/authorize';
 import { recordAudit } from '@/server/audit/logger';
-import { localStorage } from '@/server/storage/local';
+import { storagePut, storageGet, storageRemove } from '@/server/storage';
 import type { AppSession } from '@/server/auth/session';
 import type { DocumentUploadInput, DocumentLinkInput } from '@/server/validators/documents';
 import { NotFoundError, ValidationError } from '@/lib/errors';
@@ -77,7 +77,7 @@ export const documentService = {
       throw new ValidationError(`Unsupported file type: ${mime}`);
     }
     const buf = Buffer.from(await file.arrayBuffer());
-    const { storagePath } = await localStorage.put(file.name, buf);
+    const { storagePath } = await storagePut(file.name, buf);
     const fileName = path.basename(storagePath);
 
     const doc = await prisma.document.create({
@@ -116,7 +116,7 @@ export const documentService = {
     await authorize(session, 'documents:read');
     const doc = await prisma.document.findUnique({ where: { id } });
     if (!doc) throw new NotFoundError('Document not found');
-    const buf = await localStorage.get(doc.storagePath);
+    const buf = await storageGet(doc.storagePath);
     return {
       buffer: buf,
       fileName: doc.originalName,
@@ -185,7 +185,7 @@ export const documentService = {
       throw new ValidationError('Document is linked to entities — unlink first');
     }
     await prisma.document.delete({ where: { id } });
-    await localStorage.remove(doc.storagePath);
+    await storageRemove(doc.storagePath);
     await recordAudit({
       actorId: actor.userId,
       branchId: doc.branchId,
