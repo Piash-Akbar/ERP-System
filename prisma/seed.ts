@@ -611,7 +611,7 @@ async function main() {
         code: c.code,
         name: c.name,
         type: c.type,
-        categoryId: customerCategoryMap.get(customerTypeMap[c.type]) ?? undefined,
+        categoryId: customerCategoryMap.get(customerTypeMap[c.type] ?? '') ?? undefined,
         city: c.city,
         country: c.type === 'EXPORT' ? 'Germany' : 'Bangladesh',
         creditLimit: new Prisma.Decimal(c.creditLimit),
