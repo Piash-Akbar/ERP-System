@@ -10,6 +10,8 @@ import {
   consumeMaterialsAction,
   recordOutputAction,
   updateOrderStatusAction,
+  addCostEntryAction,
+  updateOverheadRateAction,
   type FactoryFormState,
 } from '@/server/actions/factory';
 import { PRODUCTION_ORDER_STATUS } from '@/server/validators/factory';
@@ -27,7 +29,7 @@ export function ProductionControls({
   order,
   warehouses,
 }: {
-  order: { id: string; status: string; materials: MaterialLite[] };
+  order: { id: string; status: string; overheadRate: string; materials: MaterialLite[] };
   warehouses: { id: string; code: string; name: string }[];
 }) {
   const [consumeState, consumeAction, consumePending] = useActionState<FactoryFormState, FormData>(
@@ -42,6 +44,14 @@ export function ProductionControls({
     updateOrderStatusAction,
     undefined,
   );
+  const [overheadRateState, overheadRateAction, overheadRatePending] =
+    useActionState<FactoryFormState, FormData>(updateOverheadRateAction, undefined);
+  const [overheadState, overheadAction, overheadPending] =
+    useActionState<FactoryFormState, FormData>(addCostEntryAction, undefined);
+  const [wedgeState, wedgeAction, wedgePending] =
+    useActionState<FactoryFormState, FormData>(addCostEntryAction, undefined);
+  const [labourState, labourAction, labourPending] =
+    useActionState<FactoryFormState, FormData>(addCostEntryAction, undefined);
 
   const [consumption, setConsumption] = useState<
     Record<string, { quantity: string; costPerUnit: string }>
@@ -51,6 +61,7 @@ export function ProductionControls({
 
   return (
     <div className="space-y-6">
+      {/* Order status */}
       <Card className="p-4 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-sm">Order status</h3>
@@ -75,6 +86,7 @@ export function ProductionControls({
         {statusState?.error && <p className="text-xs text-red-600">{statusState.error}</p>}
       </Card>
 
+      {/* Consume materials */}
       <Card className="p-4 space-y-3">
         <h3 className="font-semibold text-sm">Consume materials</h3>
         {order.materials.length === 0 ? (
@@ -156,6 +168,7 @@ export function ProductionControls({
         )}
       </Card>
 
+      {/* Record output */}
       <Card className="p-4 space-y-3">
         <h3 className="font-semibold text-sm">Record output</h3>
         <form action={outputAction} className="space-y-3">
@@ -191,6 +204,118 @@ export function ProductionControls({
           </Button>
           {outputState?.error && <p className="text-xs text-red-600">{outputState.error}</p>}
           {outputState?.success && <p className="text-xs text-emerald-600">Output recorded.</p>}
+        </form>
+      </Card>
+
+      {/* Overhead rate (%) */}
+      <Card className="p-4 space-y-3">
+        <h3 className="font-semibold text-sm">Overhead rate (%)</h3>
+        <form action={overheadRateAction} className="flex gap-2">
+          <input type="hidden" name="orderId" value={order.id} />
+          <Input
+            name="overheadRate"
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            defaultValue={order.overheadRate}
+            placeholder="e.g. 15"
+            className="flex-1"
+          />
+          <Button size="sm" type="submit" variant="outline" disabled={overheadRatePending || closed}>
+            {overheadRatePending ? 'Saving…' : 'Set'}
+          </Button>
+        </form>
+        <p className="text-xs text-muted-foreground">Applied as % on total material cost</p>
+        {overheadRateState?.error && (
+          <p className="text-xs text-red-600">{overheadRateState.error}</p>
+        )}
+        {overheadRateState?.success && (
+          <p className="text-xs text-emerald-600">Overhead rate updated.</p>
+        )}
+      </Card>
+
+      {/* Add overhead entry */}
+      <Card className="p-4 space-y-3">
+        <h3 className="font-semibold text-sm">Add overhead entry</h3>
+        <form action={overheadAction} className="space-y-2">
+          <input type="hidden" name="orderId" value={order.id} />
+          <input type="hidden" name="type" value="OVERHEAD" />
+          <div>
+            <Label className="text-xs">Description</Label>
+            <Input name="description" type="text" placeholder="e.g. Rent, Electricity" required maxLength={255} />
+          </div>
+          <div>
+            <Label className="text-xs">Amount</Label>
+            <Input name="amount" type="number" min="0" step="0.01" required />
+          </div>
+          <div>
+            <Label className="text-xs">Note (optional)</Label>
+            <Input name="note" type="text" maxLength={500} />
+          </div>
+          <Button size="sm" type="submit" variant="outline" className="w-full" disabled={overheadPending || closed}>
+            {overheadPending ? 'Adding…' : 'Add overhead'}
+          </Button>
+          {overheadState?.error && <p className="text-xs text-red-600">{overheadState.error}</p>}
+          {overheadState?.success && <p className="text-xs text-emerald-600">Overhead entry added.</p>}
+        </form>
+      </Card>
+
+      {/* Add wedge / sundry entry */}
+      <Card className="p-4 space-y-3">
+        <h3 className="font-semibold text-sm">Add wedge / sundry entry</h3>
+        <form action={wedgeAction} className="space-y-2">
+          <input type="hidden" name="orderId" value={order.id} />
+          <input type="hidden" name="type" value="WEDGE" />
+          <div>
+            <Label className="text-xs">Description</Label>
+            <Input name="description" type="text" placeholder="e.g. Transport, Packaging" required maxLength={255} />
+          </div>
+          <div>
+            <Label className="text-xs">Amount</Label>
+            <Input name="amount" type="number" min="0" step="0.01" required />
+          </div>
+          <div>
+            <Label className="text-xs">Note (optional)</Label>
+            <Input name="note" type="text" maxLength={500} />
+          </div>
+          <Button size="sm" type="submit" variant="outline" className="w-full" disabled={wedgePending || closed}>
+            {wedgePending ? 'Adding…' : 'Add wedge'}
+          </Button>
+          {wedgeState?.error && <p className="text-xs text-red-600">{wedgeState.error}</p>}
+          {wedgeState?.success && <p className="text-xs text-emerald-600">Wedge entry added.</p>}
+        </form>
+      </Card>
+
+      {/* Add labour entry */}
+      <Card className="p-4 space-y-3">
+        <h3 className="font-semibold text-sm">Add labour entry</h3>
+        <form action={labourAction} className="space-y-2">
+          <input type="hidden" name="orderId" value={order.id} />
+          <input type="hidden" name="type" value="LABOUR" />
+          <div>
+            <Label className="text-xs">Task / worker</Label>
+            <Input name="description" type="text" placeholder="e.g. Cutting — John" required maxLength={255} />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="text-xs">Hours</Label>
+              <Input name="hours" type="number" min="0.01" step="0.01" required />
+            </div>
+            <div>
+              <Label className="text-xs">Rate / hr</Label>
+              <Input name="rate" type="number" min="0" step="0.01" required />
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs">Note (optional)</Label>
+            <Input name="note" type="text" maxLength={500} />
+          </div>
+          <Button size="sm" type="submit" variant="outline" className="w-full" disabled={labourPending || closed}>
+            {labourPending ? 'Adding…' : 'Add labour'}
+          </Button>
+          {labourState?.error && <p className="text-xs text-red-600">{labourState.error}</p>}
+          {labourState?.success && <p className="text-xs text-emerald-600">Labour entry added.</p>}
         </form>
       </Card>
     </div>

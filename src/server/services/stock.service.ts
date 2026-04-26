@@ -102,6 +102,8 @@ export const stockService = {
       productId?: string;
       direction?: 'IN' | 'OUT';
       refType?: string;
+      from?: Date;
+      to?: Date;
       limit?: number;
     },
   ) {
@@ -113,6 +115,10 @@ export const stockService = {
         productId: filters.productId,
         direction: filters.direction,
         refType: filters.refType,
+        createdAt: {
+          gte: filters.from,
+          lte: filters.to,
+        },
       },
       orderBy: { createdAt: 'desc' },
       take: filters.limit ?? 200,

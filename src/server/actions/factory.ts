@@ -10,6 +10,9 @@ import {
   productionOutputSchema,
   productionStageUpdateSchema,
   productionOrderStatusSchema,
+  productionCostEntryCreateSchema,
+  productionCostEntryDeleteSchema,
+  productionOverheadRateSchema,
 } from '@/server/validators/factory';
 import { ApiError } from '@/lib/errors';
 
@@ -138,5 +141,70 @@ export async function updateOrderStatusAction(
   }
   revalidatePath(`/factory/${parsed.data.orderId}`);
   revalidatePath('/factory');
+  return { success: true };
+}
+
+export async function addCostEntryAction(
+  _prev: FactoryFormState,
+  formData: FormData,
+): Promise<FactoryFormState> {
+  const parsed = productionCostEntryCreateSchema.safeParse({
+    orderId: formData.get('orderId'),
+    type: formData.get('type'),
+    description: formData.get('description'),
+    hours: formData.get('hours') ?? undefined,
+    rate: formData.get('rate') ?? undefined,
+    amount: formData.get('amount') ?? undefined,
+    note: formData.get('note') ?? '',
+  });
+  if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
+  try {
+    const session = await getSession();
+    await factoryService.addCostEntry(session, parsed.data);
+  } catch (e) {
+    if (e instanceof ApiError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath(`/factory/${parsed.data.orderId}`);
+  return { success: true };
+}
+
+export async function deleteCostEntryAction(
+  _prev: FactoryFormState,
+  formData: FormData,
+): Promise<FactoryFormState> {
+  const parsed = productionCostEntryDeleteSchema.safeParse({
+    entryId: formData.get('entryId'),
+    orderId: formData.get('orderId'),
+  });
+  if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
+  try {
+    const session = await getSession();
+    await factoryService.deleteCostEntry(session, parsed.data);
+  } catch (e) {
+    if (e instanceof ApiError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath(`/factory/${parsed.data.orderId}`);
+  return { success: true };
+}
+
+export async function updateOverheadRateAction(
+  _prev: FactoryFormState,
+  formData: FormData,
+): Promise<FactoryFormState> {
+  const parsed = productionOverheadRateSchema.safeParse({
+    orderId: formData.get('orderId'),
+    overheadRate: formData.get('overheadRate'),
+  });
+  if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
+  try {
+    const session = await getSession();
+    await factoryService.updateOverheadRate(session, parsed.data);
+  } catch (e) {
+    if (e instanceof ApiError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath(`/factory/${parsed.data.orderId}`);
   return { success: true };
 }

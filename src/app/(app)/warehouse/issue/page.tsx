@@ -1,3 +1,5 @@
+import Link from 'next/link';
+import { History } from 'lucide-react';
 import { getSession } from '@/server/auth/session';
 import { warehouseService } from '@/server/services/warehouse.service';
 import { prisma } from '@/server/db';
@@ -5,6 +7,7 @@ import { postIssueAction } from '@/server/actions/stock';
 import { PageHeader } from '@/components/shared/page-header';
 import { StockMovementForm } from '@/components/shared/stock-movement-form';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 export const metadata = { title: 'Goods issue' };
 
@@ -44,7 +47,14 @@ export default async function IssuePage() {
       <PageHeader
         title="Goods issue"
         description="Scan or type SKU / barcode to issue items from the warehouse."
-      />
+      >
+        <Button variant="outline" asChild>
+          <Link href="/warehouse/issued">
+            <History className="h-4 w-4" />
+            View issued log
+          </Link>
+        </Button>
+      </PageHeader>
       <StockMovementForm
         mode="issue"
         branchId={branchId}

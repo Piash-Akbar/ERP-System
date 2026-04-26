@@ -17,6 +17,8 @@ export type ProductRow = {
   unit: string;
   costPrice: string;
   sellPrice: string;
+  reorderLevel: string;
+  availableQty: string;
   isActive: boolean;
   category: { id: string; name: string } | null;
 };
@@ -106,6 +108,7 @@ export function ProductsBrowser({ products, canWrite }: { products: ProductRow[]
                       <th className="text-left font-semibold px-4 py-2">Unit</th>
                       <th className="text-right font-semibold px-4 py-2">Cost</th>
                       <th className="text-right font-semibold px-4 py-2">Sell</th>
+                      <th className="text-right font-semibold px-4 py-2">Available</th>
                       <th className="text-left font-semibold px-4 py-2">Status</th>
                       <th className="text-right font-semibold px-4 py-2">Actions</th>
                     </tr>
@@ -118,6 +121,19 @@ export function ProductsBrowser({ products, canWrite }: { products: ProductRow[]
                         <td className="px-4 py-3 text-muted-foreground">{p.unit}</td>
                         <td className="px-4 py-3 text-right tabular">{formatCurrency(p.costPrice)}</td>
                         <td className="px-4 py-3 text-right tabular">{formatCurrency(p.sellPrice)}</td>
+                        <td className="px-4 py-3 text-right tabular-nums">
+                          {(() => {
+                            const qty = parseFloat(p.availableQty);
+                            const reorder = parseFloat(p.reorderLevel);
+                            const isLow = qty <= reorder && reorder > 0;
+                            const isOut = qty <= 0;
+                            return (
+                              <span className={isOut ? 'text-red-500 font-semibold' : isLow ? 'text-amber-500 font-semibold' : 'text-emerald-600 font-semibold'}>
+                                {qty % 1 === 0 ? qty.toFixed(0) : qty.toFixed(2)} {p.unit}
+                              </span>
+                            );
+                          })()}
+                        </td>
                         <td className="px-4 py-3">
                           <Badge variant={p.isActive ? 'success' : 'outline'}>
                             {p.isActive ? 'Active' : 'Inactive'}

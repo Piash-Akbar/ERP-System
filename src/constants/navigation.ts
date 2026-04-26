@@ -283,4 +283,14 @@ export const MODULES: NavModule[] = [
       { label: 'Payroll', href: '/hr/payroll', permission: 'hr:read' },
     ],
   },
+  {
+    number: 25,
+    label: 'Cash Flow',
+    href: '/cash-flow',
+    iconName: 'ArrowRightLeft',
+    permission: 'reports:read',
+    items: [
+      { label: 'Daily / Range', href: '/cash-flow', permission: 'reports:read' },
+    ],
+  },
 ];

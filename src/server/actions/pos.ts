@@ -16,7 +16,7 @@ export type ActionState =
   | { error?: string; fieldErrors?: Record<string, string[]>; success?: boolean; saleId?: string }
   | undefined;
 
-export async function openPosSessionAction(formData: FormData): Promise<ActionState> {
+export async function openPosSessionAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = openSessionSchema.safeParse({
     branchId: formData.get('branchId'),
     warehouseId: formData.get('warehouseId'),

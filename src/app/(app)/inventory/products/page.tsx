@@ -21,6 +21,8 @@ export default async function ProductsPage() {
     unit: p.unit,
     costPrice: p.costPrice.toString(),
     sellPrice: p.sellPrice.toString(),
+    reorderLevel: p.reorderLevel.toString(),
+    availableQty: p.availableQty.toString(),
     isActive: p.isActive,
     category: p.category ? { id: p.category.id, name: p.category.name } : null,
   }));

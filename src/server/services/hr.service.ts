@@ -400,15 +400,16 @@ export const hrService = {
 
       for (const emp of employees) {
         const att = attByEmp.get(emp.id) ?? [];
-        const presentDays = att.filter((a) =>
-          ['PRESENT', 'LATE', 'HALF_DAY'].includes(a.status),
+        const fullDays = att.filter((a) =>
+          ['PRESENT', 'LATE'].includes(a.status),
         ).length;
         const halfDays = att.filter((a) => a.status === 'HALF_DAY').length;
         const absentDays = att.filter((a) => a.status === 'ABSENT').length;
         const leaveDays = leaveDaysByEmp.get(emp.id) ?? 0;
 
-        // Worked days = full present + half-day * 0.5, but we store as int so floor.
-        const workedDays = Math.min(workingDays, Math.max(0, presentDays - Math.floor(halfDays / 2)));
+        // Worked days = full present + half-day * 0.5
+        const effectiveWorked = fullDays + halfDays * 0.5;
+        const workedDays = Math.min(workingDays, Math.max(0, effectiveWorked));
 
         // Prorate salary by (worked + paid leave) / workingDays.
         const paidRatio = D(workedDays + leaveDays).div(workingDays).toNumber();

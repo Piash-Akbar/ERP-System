@@ -92,3 +92,48 @@ export const productionOrderStatusSchema = z.object({
   status: z.enum(PRODUCTION_ORDER_STATUS),
 });
 export type ProductionOrderStatusInput = z.infer<typeof productionOrderStatusSchema>;
+
+export const PRODUCTION_COST_TYPES = ['OVERHEAD', 'WEDGE', 'LABOUR'] as const;
+
+export const productionCostEntryCreateSchema = z
+  .object({
+    orderId: z.string().cuid(),
+    type: z.enum(PRODUCTION_COST_TYPES),
+    description: z.string().trim().min(1).max(255),
+    hours: z.coerce.number().positive().optional(),
+    rate: z.coerce.number().min(0).optional(),
+    amount: z.coerce.number().min(0).optional(),
+    note: z.string().trim().max(500).optional().or(z.literal('')),
+  })
+  .superRefine((val, ctx) => {
+    if (val.type === 'LABOUR') {
+      if (!val.hours || !val.rate) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Hours and rate are required for labour entries',
+          path: ['hours'],
+        });
+      }
+    } else {
+      if (val.amount === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Amount is required',
+          path: ['amount'],
+        });
+      }
+    }
+  });
+export type ProductionCostEntryCreateInput = z.infer<typeof productionCostEntryCreateSchema>;
+
+export const productionCostEntryDeleteSchema = z.object({
+  entryId: z.string().cuid(),
+  orderId: z.string().cuid(),
+});
+export type ProductionCostEntryDeleteInput = z.infer<typeof productionCostEntryDeleteSchema>;
+
+export const productionOverheadRateSchema = z.object({
+  orderId: z.string().cuid(),
+  overheadRate: z.coerce.number().min(0, 'Rate cannot be negative').max(100, 'Rate cannot exceed 100%'),
+});
+export type ProductionOverheadRateInput = z.infer<typeof productionOverheadRateSchema>;

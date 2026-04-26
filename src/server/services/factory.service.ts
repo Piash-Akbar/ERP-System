@@ -10,6 +10,9 @@ import type {
   ProductionOutputInput,
   ProductionStageUpdateInput,
   ProductionOrderStatusInput,
+  ProductionCostEntryCreateInput,
+  ProductionCostEntryDeleteInput,
+  ProductionOverheadRateInput,
 } from '@/server/validators/factory';
 import { NotFoundError, ValidationError } from '@/lib/errors';
 import { nextProductionNumber } from '@/lib/document-number';
@@ -17,10 +20,10 @@ import { nextProductionNumber } from '@/lib/document-number';
 const ORDER_INCLUDE = {
   branch: { select: { id: true, name: true, code: true, currency: true, allowNegativeStock: true } },
   product: { select: { id: true, sku: true, name: true, unit: true } },
-  stages: { orderBy: { sequence: 'asc' } },
+  stages: { orderBy: { sequence: 'asc' as const } },
   materials: {
     include: {
-      product: { select: { id: true, sku: true, name: true, unit: true } },
+      product: { select: { id: true, sku: true, name: true, unit: true, costPrice: true } },
       fromWarehouse: { select: { id: true, code: true, name: true } },
     },
   },
@@ -28,8 +31,9 @@ const ORDER_INCLUDE = {
     include: {
       toWarehouse: { select: { id: true, code: true, name: true } },
     },
-    orderBy: { createdAt: 'desc' },
+    orderBy: { createdAt: 'desc' as const },
   },
+  costEntries: { orderBy: { createdAt: 'asc' as const } },
 } satisfies Prisma.ProductionOrderInclude;
 
 async function balanceFor(
@@ -44,6 +48,65 @@ async function balanceFor(
      WHERE "branchId" = ${branchId} AND "warehouseId" = ${warehouseId} AND "productId" = ${productId}
   `;
   return new Prisma.Decimal(rows[0]?.balance ?? 0);
+}
+
+export interface ProductionCostSummary {
+  materialCost: Prisma.Decimal;
+  labourCost: Prisma.Decimal;
+  fixedOverheadCost: Prisma.Decimal;
+  percentOverheadCost: Prisma.Decimal;
+  wedgeCost: Prisma.Decimal;
+  totalCost: Prisma.Decimal;
+  costPerUnit: Prisma.Decimal | null;
+}
+
+export function getCostSummary(params: {
+  outputs: { quantity: Prisma.Decimal; costPerUnit: Prisma.Decimal }[];
+  materials: { consumedQty: Prisma.Decimal; product: { costPrice: Prisma.Decimal } }[];
+  costEntries: { type: string; amount: Prisma.Decimal }[];
+  overheadRate: Prisma.Decimal | null;
+  producedQty: Prisma.Decimal;
+}): ProductionCostSummary {
+  const ZERO = new Prisma.Decimal(0);
+
+  const outputCost = params.outputs.reduce(
+    (s, o) => s.plus(o.quantity.times(o.costPerUnit)),
+    ZERO,
+  );
+  const materialCost = outputCost.gt(0)
+    ? outputCost
+    : params.materials.reduce(
+        (s, m) => s.plus(m.consumedQty.times(m.product.costPrice)),
+        ZERO,
+      );
+
+  const labourCost = params.costEntries
+    .filter((e) => e.type === 'LABOUR')
+    .reduce((s, e) => s.plus(e.amount), ZERO);
+
+  const fixedOverheadCost = params.costEntries
+    .filter((e) => e.type === 'OVERHEAD')
+    .reduce((s, e) => s.plus(e.amount), ZERO);
+
+  const wedgeCost = params.costEntries
+    .filter((e) => e.type === 'WEDGE')
+    .reduce((s, e) => s.plus(e.amount), ZERO);
+
+  const percentOverheadCost = params.overheadRate
+    ? materialCost.times(params.overheadRate).dividedBy(100)
+    : ZERO;
+
+  const totalCost = materialCost
+    .plus(labourCost)
+    .plus(fixedOverheadCost)
+    .plus(percentOverheadCost)
+    .plus(wedgeCost);
+
+  const costPerUnit = params.producedQty.gt(0)
+    ? totalCost.dividedBy(params.producedQty).toDecimalPlaces(4)
+    : null;
+
+  return { materialCost, labourCost, fixedOverheadCost, percentOverheadCost, wedgeCost, totalCost, costPerUnit };
 }
 
 export const factoryService = {
@@ -392,5 +455,129 @@ export const factoryService = {
       }),
     ]);
     return { planned, inProgress, completed, overdue };
+  },
+
+  async addCostEntry(session: AppSession | null, input: ProductionCostEntryCreateInput) {
+    const actor = await authorize(session, 'factory:execute');
+    const order = await prisma.productionOrder.findUnique({ where: { id: input.orderId } });
+    if (!order) throw new NotFoundError('Production order not found');
+    if (order.status === 'COMPLETED' || order.status === 'CANCELLED') {
+      throw new ValidationError(`Cannot add cost entries to a ${order.status.toLowerCase()} order`);
+    }
+
+    return prisma.$transaction(async (tx) => {
+      let amount: Prisma.Decimal;
+      let hours: Prisma.Decimal | null = null;
+      let rate: Prisma.Decimal | null = null;
+
+      if (input.type === 'LABOUR') {
+        hours = new Prisma.Decimal(input.hours!);
+        rate = new Prisma.Decimal(input.rate!);
+        amount = hours.times(rate);
+      } else {
+        amount = new Prisma.Decimal(input.amount!);
+      }
+
+      const entry = await tx.productionCostEntry.create({
+        data: {
+          orderId: input.orderId,
+          type: input.type,
+          description: input.description,
+          hours,
+          rate,
+          amount,
+          note: input.note || null,
+          createdById: actor.userId,
+        },
+      });
+
+      await recordAudit(
+        {
+          actorId: actor.userId,
+          branchId: order.branchId,
+          module: 'factory',
+          action: 'cost-entry-add',
+          entityType: 'ProductionCostEntry',
+          entityId: entry.id,
+          after: {
+            orderId: order.id,
+            type: input.type,
+            description: input.description,
+            amount: amount.toString(),
+          },
+        },
+        tx,
+      );
+
+      return entry;
+    });
+  },
+
+  async deleteCostEntry(session: AppSession | null, input: ProductionCostEntryDeleteInput) {
+    const actor = await authorize(session, 'factory:execute');
+    const entry = await prisma.productionCostEntry.findUnique({
+      where: { id: input.entryId },
+      include: { order: { select: { id: true, branchId: true, status: true } } },
+    });
+    if (!entry) throw new NotFoundError('Cost entry not found');
+    if (entry.orderId !== input.orderId) throw new ValidationError('Entry does not belong to this order');
+    if (entry.order.status === 'COMPLETED' || entry.order.status === 'CANCELLED') {
+      throw new ValidationError('Cannot delete cost entries on a closed order');
+    }
+
+    return prisma.$transaction(async (tx) => {
+      await tx.productionCostEntry.delete({ where: { id: entry.id } });
+
+      await recordAudit(
+        {
+          actorId: actor.userId,
+          branchId: entry.order.branchId,
+          module: 'factory',
+          action: 'cost-entry-delete',
+          entityType: 'ProductionCostEntry',
+          entityId: entry.id,
+          before: {
+            type: entry.type,
+            description: entry.description,
+            amount: entry.amount.toString(),
+          },
+        },
+        tx,
+      );
+
+      return { deleted: true };
+    });
+  },
+
+  async updateOverheadRate(session: AppSession | null, input: ProductionOverheadRateInput) {
+    const actor = await authorize(session, 'factory:execute');
+    const order = await prisma.productionOrder.findUnique({ where: { id: input.orderId } });
+    if (!order) throw new NotFoundError('Production order not found');
+    if (order.status === 'COMPLETED' || order.status === 'CANCELLED') {
+      throw new ValidationError('Cannot update overhead rate on a closed order');
+    }
+
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.productionOrder.update({
+        where: { id: order.id },
+        data: { overheadRate: new Prisma.Decimal(input.overheadRate) },
+      });
+
+      await recordAudit(
+        {
+          actorId: actor.userId,
+          branchId: order.branchId,
+          module: 'factory',
+          action: 'overhead-rate-update',
+          entityType: 'ProductionOrder',
+          entityId: order.id,
+          before: { overheadRate: order.overheadRate?.toString() ?? null },
+          after: { overheadRate: input.overheadRate.toString() },
+        },
+        tx,
+      );
+
+      return updated;
+    });
   },
 };

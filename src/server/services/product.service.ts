@@ -25,10 +25,32 @@ function generateBarcode(): string {
 export const productService = {
   async list(session: AppSession | null) {
     await authorize(session, 'inventory:read');
-    return prisma.product.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: PRODUCT_INCLUDE,
-    });
+    const [products, ledgerAgg] = await Promise.all([
+      prisma.product.findMany({
+        orderBy: { createdAt: 'desc' },
+        include: PRODUCT_INCLUDE,
+      }),
+      prisma.inventoryLedger.groupBy({
+        by: ['productId', 'direction'],
+        _sum: { quantity: true },
+      }),
+    ]);
+
+    // Build a map: productId → net available qty (IN - OUT)
+    const qtyMap = new Map<string, Prisma.Decimal>();
+    for (const row of ledgerAgg) {
+      const current = qtyMap.get(row.productId) ?? new Prisma.Decimal(0);
+      const delta = row._sum.quantity ?? new Prisma.Decimal(0);
+      qtyMap.set(
+        row.productId,
+        row.direction === 'IN' ? current.plus(delta) : current.minus(delta),
+      );
+    }
+
+    return products.map((p) => ({
+      ...p,
+      availableQty: qtyMap.get(p.id) ?? new Prisma.Decimal(0),
+    }));
   },
 
   async assignBarcode(session: AppSession | null, id: string) {

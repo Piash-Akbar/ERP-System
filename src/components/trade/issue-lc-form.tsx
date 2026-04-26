@@ -70,11 +70,17 @@ export function IssueLCForm({ orders, branches, defaultBranchId, preselectedOrde
       applicantName: '',
       beneficiaryName: '',
       issuingBank: '',
+      issuingBankSwift: '',
       advisingBank: '',
+      advisingBankSwift: '',
+      confirmingBank: '',
       portOfLoading: '',
       portOfDischarge: '',
       goodsDescription: '',
       specialConditions: '',
+      expiryPlace: '',
+      latestShipDate: undefined,
+      swiftMt700Ref: '',
     },
   });
 

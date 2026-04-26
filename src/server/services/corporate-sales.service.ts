@@ -536,6 +536,10 @@ export const corporateService = {
           where: { id: orig.id },
           data: { deliveredQty: orig.deliveredQty.plus(D(d.quantity)) },
         });
+        const product = await tx.product.findUnique({
+          where: { id: orig.productId },
+          select: { costPrice: true },
+        });
         await tx.inventoryLedger.create({
           data: {
             branchId: order.branchId,
@@ -543,7 +547,7 @@ export const corporateService = {
             productId: orig.productId,
             direction: 'OUT',
             quantity: D(d.quantity),
-            costPerUnit: ZERO,
+            costPerUnit: product?.costPrice ?? ZERO,
             refType: 'CORP_DELIVERY',
             refId: delivery.id,
             createdById: actor.userId,

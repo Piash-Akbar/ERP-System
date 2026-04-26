@@ -203,11 +203,14 @@ export const reportsService = {
   async inventoryValuation(session: AppSession | null, f: { branchId?: string } = {}) {
     await authorize(session, 'reports:read');
 
-    const grouped = await prisma.inventoryLedger.groupBy({
-      by: ['productId'],
-      where: { branchId: f.branchId },
-      _sum: { quantity: true },
-    });
+    const branchFilter = f.branchId ? Prisma.sql`AND "branchId" = ${f.branchId}` : Prisma.empty;
+    const grouped = await prisma.$queryRaw<
+      { productId: string; balance: string }[]
+    >`SELECT "productId",
+             SUM(CASE WHEN direction = 'IN' THEN quantity ELSE -quantity END)::text AS balance
+        FROM "InventoryLedger"
+       WHERE 1=1 ${branchFilter}
+       GROUP BY "productId"`;
 
     const productIds = grouped.map((g) => g.productId);
     if (productIds.length === 0) return { rows: [], totals: { qty: ZERO, value: ZERO } };
@@ -222,7 +225,7 @@ export const reportsService = {
       .map((g) => {
         const p = byId.get(g.productId);
         if (!p) return null;
-        const qty = g._sum.quantity ?? ZERO;
+        const qty = new Prisma.Decimal(g.balance ?? 0);
         const value = qty.mul(p.costPrice);
         return {
           productId: g.productId,
@@ -315,5 +318,236 @@ export const reportsService = {
       lowStockProducts: inv.rows.filter((r) => r.belowReorder).length,
       activeProducts: lowStock,
     };
+  },
+
+  /**
+   * Cash-flow summary for a date range.
+   * INCOME  = POS cash collected + Wholesale payments received + Corporate payments received
+   * OUTCOME = Supplier payments made
+   */
+  async cashFlow(session: AppSession | null, f: RangeFilter = {}) {
+    await authorize(session, 'reports:read');
+
+    const [
+      posAgg,
+      wholesalePayAgg,
+      corporatePayAgg,
+      supplierPayAgg,
+      posRows,
+      wholesalePayRows,
+      corporatePayRows,
+      supplierPayRows,
+    ] = await Promise.all([
+      // ── Income aggregates ─────────────────────────────────────────────────
+      prisma.posSale.aggregate({
+        where: {
+          branchId: f.branchId,
+          saleDate: { gte: f.from, lte: f.to },
+          status: { not: 'VOIDED' },
+        },
+        _sum: { paidTotal: true },
+        _count: { _all: true },
+      }),
+      prisma.wholesalePayment.aggregate({
+        where: {
+          paidAt: { gte: f.from, lte: f.to },
+          invoice: { branchId: f.branchId },
+        },
+        _sum: { amount: true },
+        _count: { _all: true },
+      }),
+      prisma.corporateInvoicePayment.aggregate({
+        where: {
+          paidAt: { gte: f.from, lte: f.to },
+          invoice: { branchId: f.branchId },
+        },
+        _sum: { amount: true },
+        _count: { _all: true },
+      }),
+      // ── Outcome aggregates ────────────────────────────────────────────────
+      prisma.supplierPayment.aggregate({
+        where: {
+          branchId: f.branchId,
+          paymentDate: { gte: f.from, lte: f.to },
+        },
+        _sum: { amount: true },
+        _count: { _all: true },
+      }),
+      // ── Income detail rows ─────────────────────────────────────────────────
+      prisma.posSale.findMany({
+        where: {
+          branchId: f.branchId,
+          saleDate: { gte: f.from, lte: f.to },
+          status: { not: 'VOIDED' },
+        },
+        select: {
+          id: true,
+          number: true,
+          saleDate: true,
+          paidTotal: true,
+          branch: { select: { code: true } },
+        },
+        orderBy: { saleDate: 'desc' },
+        take: 500,
+      }),
+      prisma.wholesalePayment.findMany({
+        where: {
+          paidAt: { gte: f.from, lte: f.to },
+          invoice: { branchId: f.branchId },
+        },
+        select: {
+          id: true,
+          amount: true,
+          method: true,
+          paidAt: true,
+          reference: true,
+          invoice: {
+            select: {
+              number: true,
+              branch: { select: { code: true } },
+              customer: { select: { name: true } },
+            },
+          },
+        },
+        orderBy: { paidAt: 'desc' },
+        take: 500,
+      }),
+      prisma.corporateInvoicePayment.findMany({
+        where: {
+          paidAt: { gte: f.from, lte: f.to },
+          invoice: { branchId: f.branchId },
+        },
+        select: {
+          id: true,
+          amount: true,
+          method: true,
+          paidAt: true,
+          reference: true,
+          invoice: {
+            select: {
+              number: true,
+              branch: { select: { code: true } },
+              customer: { select: { name: true } },
+            },
+          },
+        },
+        orderBy: { paidAt: 'desc' },
+        take: 500,
+      }),
+      prisma.supplierPayment.findMany({
+        where: {
+          branchId: f.branchId,
+          paymentDate: { gte: f.from, lte: f.to },
+        },
+        select: {
+          id: true,
+          number: true,
+          amount: true,
+          method: true,
+          paymentDate: true,
+          reference: true,
+          supplier: { select: { name: true } },
+          branch: { select: { code: true } },
+        },
+        orderBy: { paymentDate: 'desc' },
+        take: 500,
+      }),
+    ]);
+
+    const incomeSources = [
+      {
+        key: 'pos',
+        label: 'POS / Retail',
+        count: posAgg._count._all,
+        amount: posAgg._sum.paidTotal ?? ZERO,
+      },
+      {
+        key: 'wholesale',
+        label: 'Wholesale payments',
+        count: wholesalePayAgg._count._all,
+        amount: wholesalePayAgg._sum.amount ?? ZERO,
+      },
+      {
+        key: 'corporate',
+        label: 'Corporate payments',
+        count: corporatePayAgg._count._all,
+        amount: corporatePayAgg._sum.amount ?? ZERO,
+      },
+    ];
+
+    const outcomeSources = [
+      {
+        key: 'supplier',
+        label: 'Supplier payments',
+        count: supplierPayAgg._count._all,
+        amount: supplierPayAgg._sum.amount ?? ZERO,
+      },
+    ];
+
+    const totalIncome = incomeSources.reduce((s, r) => s.plus(r.amount), ZERO);
+    const totalOutcome = outcomeSources.reduce((s, r) => s.plus(r.amount), ZERO);
+    const net = totalIncome.minus(totalOutcome);
+
+    // Unified transaction rows for detail table
+    type CashRow = {
+      id: string;
+      date: Date;
+      flow: 'IN' | 'OUT';
+      source: string;
+      ref: string;
+      party: string;
+      method: string;
+      amount: Prisma.Decimal;
+      branch: string;
+    };
+
+    const rows: CashRow[] = [
+      ...posRows.map((r) => ({
+        id: r.id,
+        date: r.saleDate,
+        flow: 'IN' as const,
+        source: 'POS Sale',
+        ref: r.number,
+        party: 'Walk-in',
+        method: 'Mixed',
+        amount: r.paidTotal,
+        branch: r.branch.code,
+      })),
+      ...wholesalePayRows.map((r) => ({
+        id: r.id,
+        date: r.paidAt,
+        flow: 'IN' as const,
+        source: 'Wholesale',
+        ref: r.invoice.number,
+        party: r.invoice.customer.name,
+        method: r.method,
+        amount: r.amount,
+        branch: r.invoice.branch.code,
+      })),
+      ...corporatePayRows.map((r) => ({
+        id: r.id,
+        date: r.paidAt,
+        flow: 'IN' as const,
+        source: 'Corporate',
+        ref: r.invoice.number,
+        party: r.invoice.customer.name,
+        method: r.method,
+        amount: r.amount,
+        branch: r.invoice.branch.code,
+      })),
+      ...supplierPayRows.map((r) => ({
+        id: r.id,
+        date: r.paymentDate,
+        flow: 'OUT' as const,
+        source: 'Supplier payment',
+        ref: r.number,
+        party: r.supplier.name,
+        method: r.method,
+        amount: r.amount,
+        branch: r.branch.code,
+      })),
+    ].sort((a, b) => b.date.getTime() - a.date.getTime());
+
+    return { incomeSources, outcomeSources, totalIncome, totalOutcome, net, rows };
   },
 };

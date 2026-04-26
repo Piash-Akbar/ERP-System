@@ -91,18 +91,18 @@ export const tradeService = {
   },
 
   async createOrder(session: AppSession | null, input: CreateTradeOrderInput) {
-    await authorize(session, 'trade:write');
-
-    const year = new Date().getFullYear();
-    const count = await prisma.tradeOrder.count({
-      where: { type: input.type, createdAt: { gte: new Date(`${year}-01-01`) } },
-    });
+    const actor = await authorize(session, 'trade:write');
 
     const totalValue = input.items.reduce((sum, it) => {
       return sum.plus(D(it.quantity).mul(D(it.unitPrice)));
     }, new Prisma.Decimal(0));
 
-    const order = await prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx) => {
+      const year = new Date().getFullYear();
+      const count = await tx.tradeOrder.count({
+        where: { type: input.type, createdAt: { gte: new Date(`${year}-01-01`) } },
+      });
+
       const created = await tx.tradeOrder.create({
         data: {
           number: nextTradeOrderNumber(year, count, input.type),
@@ -122,7 +122,7 @@ export const tradeService = {
           expectedArrival: input.expectedArrival ?? null,
           goodsDescription: input.goodsDescription || null,
           notes: input.notes || null,
-          createdById: session?.userId ?? null,
+          createdById: actor.userId,
           items: {
             create: input.items.map((it) => ({
               productId: it.productId || null,
@@ -137,7 +137,7 @@ export const tradeService = {
         },
       });
       await recordAudit({
-        actorId: session?.userId ?? null,
+        actorId: actor.userId,
         branchId: input.branchId,
         module: 'trade',
         action: 'CREATE_ORDER',
@@ -147,22 +147,20 @@ export const tradeService = {
       }, tx);
       return created;
     });
-
-    return order;
   },
 
   async updateOrderStatus(session: AppSession | null, input: UpdateTradeOrderStatusInput) {
-    await authorize(session, 'trade:write');
+    const actor = await authorize(session, 'trade:write');
     const order = await prisma.tradeOrder.findUnique({ where: { id: input.orderId } });
     if (!order) throw new NotFoundError('Trade order not found');
 
     const updated = await prisma.$transaction(async (tx) => {
       const u = await tx.tradeOrder.update({
         where: { id: input.orderId },
-        data: { status: input.status, updatedById: session?.userId ?? null },
+        data: { status: input.status, updatedById: actor.userId },
       });
       await recordAudit({
-        actorId: session?.userId ?? null,
+        actorId: actor.userId,
         branchId: order.branchId,
         module: 'trade',
         action: 'UPDATE_ORDER_STATUS',
@@ -179,13 +177,13 @@ export const tradeService = {
   // ─── Shipments ───────────────────────────────────────────────────────────────
 
   async createShipment(session: AppSession | null, input: CreateShipmentInput) {
-    await authorize(session, 'trade:shipment');
+    const actor = await authorize(session, 'trade:shipment');
     const order = await prisma.tradeOrder.findUnique({ where: { id: input.tradeOrderId } });
     if (!order) throw new NotFoundError('Trade order not found');
 
-    const count = await prisma.tradeShipment.count({ where: { tradeOrderId: input.tradeOrderId } });
-
     return prisma.$transaction(async (tx) => {
+      const count = await tx.tradeShipment.count({ where: { tradeOrderId: input.tradeOrderId } });
+
       const shipment = await tx.tradeShipment.create({
         data: {
           tradeOrderId: input.tradeOrderId,
@@ -211,11 +209,11 @@ export const tradeService = {
           freightCost: input.freightCost != null ? D(input.freightCost) : null,
           insuranceCost: input.insuranceCost != null ? D(input.insuranceCost) : null,
           notes: input.notes || null,
-          createdById: session?.userId ?? null,
+          createdById: actor.userId,
         },
       });
       await recordAudit({
-        actorId: session?.userId ?? null,
+        actorId: actor.userId,
         branchId: order.branchId,
         module: 'trade',
         action: 'CREATE_SHIPMENT',
@@ -228,7 +226,7 @@ export const tradeService = {
   },
 
   async updateShipmentStatus(session: AppSession | null, input: UpdateShipmentStatusInput) {
-    await authorize(session, 'trade:shipment');
+    const actor = await authorize(session, 'trade:shipment');
     const shipment = await prisma.tradeShipment.findUnique({
       where: { id: input.shipmentId },
       include: { tradeOrder: { select: { branchId: true } } },
@@ -244,7 +242,7 @@ export const tradeService = {
         },
       });
       await recordAudit({
-        actorId: session?.userId ?? null,
+        actorId: actor.userId,
         branchId: shipment.tradeOrder.branchId,
         module: 'trade',
         action: 'UPDATE_SHIPMENT_STATUS',
@@ -308,7 +306,7 @@ export const tradeService = {
   },
 
   async createLC(session: AppSession | null, input: CreateLCInput) {
-    await authorize(session, 'trade:lc-issue');
+    const actor = await authorize(session, 'trade:lc-issue');
 
     const order = await prisma.tradeOrder.findUnique({ where: { id: input.tradeOrderId } });
     if (!order) throw new NotFoundError('Trade order not found');
@@ -318,14 +316,14 @@ export const tradeService = {
     });
     if (existing) throw new ValidationError('This trade order already has an LC');
 
-    const year = new Date().getFullYear();
-    const count = await prisma.letterOfCredit.count({
-      where: { createdAt: { gte: new Date(`${year}-01-01`) } },
-    });
-
     const lcAmount = D(input.lcAmount);
 
     return prisma.$transaction(async (tx) => {
+      const year = new Date().getFullYear();
+      const count = await tx.letterOfCredit.count({
+        where: { createdAt: { gte: new Date(`${year}-01-01`) } },
+      });
+
       const lc = await tx.letterOfCredit.create({
         data: {
           number: nextDocumentNumber('LC', year, count),
@@ -357,12 +355,12 @@ export const tradeService = {
           goodsDescription: input.goodsDescription || null,
           specialConditions: input.specialConditions || null,
           swiftMt700Ref: input.swiftMt700Ref || null,
-          createdById: session?.userId ?? null,
-          issuedById: session?.userId ?? null,
+          createdById: actor.userId,
+          issuedById: actor.userId,
         },
       });
       await recordAudit({
-        actorId: session?.userId ?? null,
+        actorId: actor.userId,
         branchId: input.branchId,
         module: 'trade',
         action: 'CREATE_LC',
@@ -375,7 +373,7 @@ export const tradeService = {
   },
 
   async updateLCStatus(session: AppSession | null, input: UpdateLCStatusInput) {
-    await authorize(session, 'trade:lc-issue');
+    const actor = await authorize(session, 'trade:lc-issue');
     const lc = await prisma.letterOfCredit.findUnique({ where: { id: input.lcId } });
     if (!lc) throw new NotFoundError('LC not found');
 
@@ -388,10 +386,10 @@ export const tradeService = {
     return prisma.$transaction(async (tx) => {
       const updated = await tx.letterOfCredit.update({
         where: { id: input.lcId },
-        data: { status: input.status, updatedById: session?.userId ?? null },
+        data: { status: input.status, updatedById: actor.userId },
       });
       await recordAudit({
-        actorId: session?.userId ?? null,
+        actorId: actor.userId,
         branchId: lc.branchId,
         module: 'trade',
         action: 'UPDATE_LC_STATUS',
@@ -407,7 +405,7 @@ export const tradeService = {
   // ─── LC Amendments ───────────────────────────────────────────────────────────
 
   async createAmendment(session: AppSession | null, input: CreateLCAmendmentInput) {
-    await authorize(session, 'trade:lc-amend');
+    const actor = await authorize(session, 'trade:lc-amend');
     const lc = await prisma.letterOfCredit.findUnique({ where: { id: input.lcId } });
     if (!lc) throw new NotFoundError('LC not found');
 
@@ -431,7 +429,7 @@ export const tradeService = {
           newLatestShipDate: input.newLatestShipDate ?? null,
           newSpecialConditions: input.newSpecialConditions || null,
           reason: input.reason,
-          requestedById: session?.userId ?? null,
+          requestedById: actor.userId,
         },
       });
       await tx.letterOfCredit.update({
@@ -439,7 +437,7 @@ export const tradeService = {
         data: { status: 'AMENDED' },
       });
       await recordAudit({
-        actorId: session?.userId ?? null,
+        actorId: actor.userId,
         branchId: lc.branchId,
         module: 'trade',
         action: 'CREATE_LC_AMENDMENT',
@@ -452,7 +450,7 @@ export const tradeService = {
   },
 
   async decideAmendment(session: AppSession | null, input: AmendmentDecisionInput) {
-    await authorize(session, 'trade:lc-amend');
+    const actor = await authorize(session, 'trade:lc-amend');
     const amendment = await prisma.lCAmendment.findUnique({
       where: { id: input.amendmentId },
       include: { lc: true },
@@ -467,9 +465,9 @@ export const tradeService = {
         where: { id: input.amendmentId },
         data: {
           status: input.decision,
-          approvedById: input.decision === 'APPROVED' ? (session?.userId ?? null) : null,
+          approvedById: input.decision === 'APPROVED' ? (actor.userId) : null,
           approvedAt: input.decision === 'APPROVED' ? new Date() : null,
-          rejectedById: input.decision === 'REJECTED' ? (session?.userId ?? null) : null,
+          rejectedById: input.decision === 'REJECTED' ? (actor.userId) : null,
           rejectionNote: input.decision === 'REJECTED' ? (input.note || null) : null,
         },
       });
@@ -495,7 +493,7 @@ export const tradeService = {
       }
 
       await recordAudit({
-        actorId: session?.userId ?? null,
+        actorId: actor.userId,
         branchId: amendment.lc.branchId,
         module: 'trade',
         action: 'DECIDE_LC_AMENDMENT',
@@ -511,7 +509,7 @@ export const tradeService = {
   // ─── LC Drawdowns ────────────────────────────────────────────────────────────
 
   async createDrawdown(session: AppSession | null, input: CreateLCDrawdownInput) {
-    await authorize(session, 'trade:lc-drawdown');
+    const actor = await authorize(session, 'trade:lc-drawdown');
     const lc = await prisma.letterOfCredit.findUnique({ where: { id: input.lcId } });
     if (!lc) throw new NotFoundError('LC not found');
 
@@ -555,7 +553,7 @@ export const tradeService = {
           inspectionCert: input.inspectionCert,
           otherDocs: input.otherDocs || null,
           notes: input.notes || null,
-          createdById: session?.userId ?? null,
+          createdById: actor.userId,
         },
       });
 
@@ -574,7 +572,7 @@ export const tradeService = {
       });
 
       await recordAudit({
-        actorId: session?.userId ?? null,
+        actorId: actor.userId,
         branchId: lc.branchId,
         module: 'trade',
         action: 'CREATE_LC_DRAWDOWN',
@@ -587,7 +585,7 @@ export const tradeService = {
   },
 
   async decideDrawdown(session: AppSession | null, input: DrawdownDecisionInput) {
-    await authorize(session, 'trade:lc-drawdown');
+    const actor = await authorize(session, 'trade:lc-drawdown');
     const drawdown = await prisma.lCDrawdown.findUnique({
       where: { id: input.drawdownId },
       include: { lc: true },
@@ -604,7 +602,7 @@ export const tradeService = {
           status: input.decision,
           paymentDueDate: input.decision === 'DOCUMENTS_ACCEPTED' ? (input.paymentDueDate ?? null) : null,
           discrepancyNote: input.discrepancyNote || null,
-          updatedById: session?.userId ?? null,
+          updatedById: actor.userId,
         },
       });
 
@@ -623,7 +621,7 @@ export const tradeService = {
       }
 
       await recordAudit({
-        actorId: session?.userId ?? null,
+        actorId: actor.userId,
         branchId: drawdown.lc.branchId,
         module: 'trade',
         action: 'DECIDE_LC_DRAWDOWN',
@@ -637,7 +635,7 @@ export const tradeService = {
   },
 
   async recordDrawdownPayment(session: AppSession | null, input: RecordDrawdownPaymentInput) {
-    await authorize(session, 'trade:lc-drawdown');
+    const actor = await authorize(session, 'trade:lc-drawdown');
     const drawdown = await prisma.lCDrawdown.findUnique({
       where: { id: input.drawdownId },
       include: { lc: true },
@@ -654,11 +652,11 @@ export const tradeService = {
           status: 'PAYMENT_RECEIVED',
           paymentReceivedAt: input.paymentReceivedAt,
           bankCharges: D(input.bankCharges),
-          updatedById: session?.userId ?? null,
+          updatedById: actor.userId,
         },
       });
       await recordAudit({
-        actorId: session?.userId ?? null,
+        actorId: actor.userId,
         branchId: drawdown.lc.branchId,
         module: 'trade',
         action: 'DRAWDOWN_PAYMENT_RECEIVED',
@@ -673,7 +671,7 @@ export const tradeService = {
   // ─── Trade Payments ──────────────────────────────────────────────────────────
 
   async createPayment(session: AppSession | null, input: CreateTradePaymentInput) {
-    await authorize(session, 'trade:payment');
+    const actor = await authorize(session, 'trade:payment');
     const order = await prisma.tradeOrder.findUnique({ where: { id: input.tradeOrderId } });
     if (!order) throw new NotFoundError('Trade order not found');
 
@@ -701,11 +699,11 @@ export const tradeService = {
           paymentDate: input.paymentDate,
           valueDate: input.valueDate ?? null,
           notes: input.notes || null,
-          createdById: session?.userId ?? null,
+          createdById: actor.userId,
         },
       });
       await recordAudit({
-        actorId: session?.userId ?? null,
+        actorId: actor.userId,
         branchId: input.branchId,
         module: 'trade',
         action: 'CREATE_TRADE_PAYMENT',
