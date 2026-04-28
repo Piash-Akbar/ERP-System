@@ -106,33 +106,42 @@ export function ProductsBrowser({ products, canWrite }: { products: ProductRow[]
                       <th className="text-left font-semibold px-4 py-2">SKU</th>
                       <th className="text-left font-semibold px-4 py-2">Name</th>
                       <th className="text-left font-semibold px-4 py-2">Unit</th>
-                      <th className="text-right font-semibold px-4 py-2">Cost</th>
-                      <th className="text-right font-semibold px-4 py-2">Sell</th>
+                      <th className="text-right font-semibold px-4 py-2">Buy / unit</th>
+                      <th className="text-right font-semibold px-4 py-2">Sell / unit</th>
                       <th className="text-right font-semibold px-4 py-2">Available</th>
+                      <th className="text-right font-semibold px-4 py-2">Total Cost</th>
+                      <th className="text-right font-semibold px-4 py-2">Total Sell</th>
                       <th className="text-left font-semibold px-4 py-2">Status</th>
                       <th className="text-right font-semibold px-4 py-2">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {group.items.map((p) => (
+                    {group.items.map((p) => {
+                      const qty = parseFloat(p.availableQty);
+                      const reorder = parseFloat(p.reorderLevel);
+                      const costPerUnit = parseFloat(p.costPrice);
+                      const sellPerUnit = parseFloat(p.sellPrice);
+                      const totalCost = costPerUnit * qty;
+                      const totalSell = sellPerUnit * qty;
+                      const isLow = qty <= reorder && reorder > 0;
+                      const isOut = qty <= 0;
+                      return (
                       <tr key={p.id} className="hover:bg-muted/30">
                         <td className="px-4 py-3 font-mono text-xs">{p.sku}</td>
                         <td className="px-4 py-3 font-medium">{p.name}</td>
                         <td className="px-4 py-3 text-muted-foreground">{p.unit}</td>
-                        <td className="px-4 py-3 text-right tabular">{formatCurrency(p.costPrice)}</td>
-                        <td className="px-4 py-3 text-right tabular">{formatCurrency(p.sellPrice)}</td>
+                        <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(costPerUnit)}</td>
+                        <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(sellPerUnit)}</td>
                         <td className="px-4 py-3 text-right tabular-nums">
-                          {(() => {
-                            const qty = parseFloat(p.availableQty);
-                            const reorder = parseFloat(p.reorderLevel);
-                            const isLow = qty <= reorder && reorder > 0;
-                            const isOut = qty <= 0;
-                            return (
-                              <span className={isOut ? 'text-red-500 font-semibold' : isLow ? 'text-amber-500 font-semibold' : 'text-emerald-600 font-semibold'}>
-                                {qty % 1 === 0 ? qty.toFixed(0) : qty.toFixed(2)} {p.unit}
-                              </span>
-                            );
-                          })()}
+                          <span className={isOut ? 'text-red-500 font-semibold' : isLow ? 'text-amber-500 font-semibold' : 'text-emerald-600 font-semibold'}>
+                            {qty % 1 === 0 ? qty.toFixed(0) : qty.toFixed(2)} {p.unit}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                          {formatCurrency(totalCost)}
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums font-medium">
+                          {formatCurrency(totalSell)}
                         </td>
                         <td className="px-4 py-3">
                           <Badge variant={p.isActive ? 'success' : 'outline'}>
@@ -151,7 +160,8 @@ export function ProductsBrowser({ products, canWrite }: { products: ProductRow[]
                           )}
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

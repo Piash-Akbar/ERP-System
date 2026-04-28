@@ -56,7 +56,7 @@ export const MODULES: NavModule[] = [
     items: [
       { label: 'Overview', href: '/warehouse', permission: 'warehouse:read' },
       { label: 'Receive', href: '/warehouse/receive', permission: 'warehouse:receive' },
-      { label: 'Issue', href: '/warehouse/issue', permission: 'warehouse:issue' },
+      { label: 'Faulty/Return Product', href: '/warehouse/issue', permission: 'warehouse:issue' },
       { label: 'Transfer', href: '/warehouse/transfer', permission: 'warehouse:transfer' },
       { label: 'Physical count', href: '/warehouse/count', permission: 'warehouse:count' },
     ],

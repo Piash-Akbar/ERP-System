@@ -8,6 +8,7 @@ import { prisma } from '@/server/db';
 import { PageHeader } from '@/components/shared/page-header';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { formatCurrency } from '@/lib/money';
 
 export const metadata = { title: 'Stock balance' };
 
@@ -18,6 +19,8 @@ type Product = {
   unit: string;
   type: import('@prisma/client').ProductType;
   reorderLevel: Prisma.Decimal;
+  costPrice: Prisma.Decimal;
+  sellPrice: Prisma.Decimal;
 };
 type Warehouse = { id: string; name: string; code: string };
 type Row = { product: Product; warehouse: Warehouse; qty: Prisma.Decimal };
@@ -42,7 +45,7 @@ export default async function StockBalancePage() {
     warehouseService.listActiveForBranch(session, branchId),
     prisma.product.findMany({
       orderBy: { name: 'asc' },
-      select: { id: true, sku: true, name: true, unit: true, reorderLevel: true, type: true },
+      select: { id: true, sku: true, name: true, unit: true, reorderLevel: true, type: true, costPrice: true, sellPrice: true },
     }),
   ]);
 
@@ -149,13 +152,17 @@ function StockSection({
                 <th className="text-left font-semibold px-4 py-3">Warehouse</th>
                 <th className="text-right font-semibold px-4 py-3">Balance</th>
                 <th className="text-left font-semibold px-4 py-3">Unit</th>
+                <th className="text-right font-semibold px-4 py-3">Buy / unit</th>
+                <th className="text-right font-semibold px-4 py-3">Sell / unit</th>
+                <th className="text-right font-semibold px-4 py-3">Total Cost</th>
+                <th className="text-right font-semibold px-4 py-3">Total Sell</th>
                 <th className="text-right font-semibold px-4 py-3">Reorder level</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                  <td colSpan={10} className="px-4 py-10 text-center text-muted-foreground">
                     {emptyLabel}
                   </td>
                 </tr>
@@ -167,6 +174,8 @@ function StockSection({
                     : r.qty.lte(0)
                       ? 'text-destructive'
                       : '';
+                const totalCost = r.product.costPrice.mul(r.qty);
+                const totalSell = r.product.sellPrice.mul(r.qty);
                 return (
                   <tr key={`${r.product.id}-${r.warehouse.id}`} className="hover:bg-muted/30">
                     <td className="px-4 py-3 font-mono text-xs">{r.product.sku}</td>
@@ -174,11 +183,23 @@ function StockSection({
                     <td className="px-4 py-3 text-muted-foreground">
                       {r.warehouse.name} <span className="text-xs">({r.warehouse.code})</span>
                     </td>
-                    <td className={`px-4 py-3 text-right tabular font-semibold ${low}`}>
+                    <td className={`px-4 py-3 text-right tabular-nums font-semibold ${low}`}>
                       {r.qty.toString()}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{r.product.unit}</td>
-                    <td className="px-4 py-3 text-right tabular text-muted-foreground">
+                    <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                      {formatCurrency(r.product.costPrice)}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                      {formatCurrency(r.product.sellPrice)}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                      {formatCurrency(totalCost)}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums font-medium">
+                      {formatCurrency(totalSell)}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
                       {r.product.reorderLevel.gt(0) ? r.product.reorderLevel.toString() : '—'}
                     </td>
                   </tr>
