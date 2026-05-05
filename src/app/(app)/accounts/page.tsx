@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Plus, BookOpen, ListChecks, BarChart3, TrendingUp, Scale, Lock } from 'lucide-react';
+import { Plus, BookOpen, ListChecks, BarChart3, TrendingUp, Scale, Lock, Droplets, Users, FileText } from 'lucide-react';
 import { getSession } from '@/server/auth/session';
 import { accountsService } from '@/server/services/accounts.service';
 import { PageHeader } from '@/components/shared/page-header';
@@ -63,6 +63,24 @@ export default async function AccountsOverviewPage() {
           title="Income statement"
           subtitle="Revenue, expenses, net profit"
           href="/accounts/income-statement"
+        />
+        <NavCard
+          icon={<Droplets className="h-5 w-5 text-primary" />}
+          title="Cash Flow Statement"
+          subtitle="Operating, investing & financing flows"
+          href="/accounts/cash-flow"
+        />
+        <NavCard
+          icon={<Users className="h-5 w-5 text-primary" />}
+          title="Changes in Equity"
+          subtitle="Share capital & retained earnings movements"
+          href="/accounts/equity-changes"
+        />
+        <NavCard
+          icon={<FileText className="h-5 w-5 text-primary" />}
+          title="Financial Notes"
+          subtitle="PP&E schedule, inventories, advances"
+          href="/accounts/financial-notes"
         />
         <NavCard
           icon={<Lock className="h-5 w-5 text-primary" />}

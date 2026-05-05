@@ -87,6 +87,11 @@ export default async function ProductionOrderPage({
             <ArrowLeft className="h-4 w-4" /> Back
           </Link>
         </Button>
+        <Button variant="secondary" asChild>
+          <Link href={`/factory/${order.id}/costing-sheet`}>
+            View Costing Sheet
+          </Link>
+        </Button>
       </PageHeader>
 
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">

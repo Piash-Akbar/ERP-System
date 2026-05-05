@@ -170,6 +170,9 @@ export const factoryService = {
           plannedStartDate: input.plannedStartDate,
           plannedEndDate: input.plannedEndDate,
           notes: input.notes || null,
+          buyerName: input.buyerName || null,
+          batchName: input.batchName || null,
+          saleAmount: input.saleAmount != null ? new Prisma.Decimal(input.saleAmount) : null,
           createdById: actor.userId,
           stages: {
             create: input.stages.map((s) => ({
@@ -183,6 +186,8 @@ export const factoryService = {
               productId: m.productId,
               unit: m.unit,
               plannedQty: new Prisma.Decimal(m.plannedQty),
+              unitCost: m.unitCost != null ? new Prisma.Decimal(m.unitCost) : null,
+              materialType: m.materialType,
               fromWarehouseId: m.fromWarehouseId || null,
               note: m.note || null,
             })),
@@ -579,5 +584,83 @@ export const factoryService = {
 
       return updated;
     });
+  },
+
+  async getCostingSheetData(session: AppSession | null, orderId: string) {
+    await authorize(session, 'factory:read');
+
+    const order = await prisma.productionOrder.findUnique({
+      where: { id: orderId },
+      include: {
+        branch: { select: { id: true, name: true, address: true, currency: true } },
+        product: { select: { id: true, sku: true, name: true } },
+        materials: {
+          include: {
+            product: { select: { id: true, name: true, sku: true, costPrice: true } },
+          },
+          orderBy: { materialType: 'asc' },
+        },
+        costEntries: { orderBy: { createdAt: 'asc' } },
+        outputs: true,
+      },
+    });
+
+    if (!order) throw new NotFoundError('Production order not found');
+
+    const ZERO = new Prisma.Decimal(0);
+
+    const leatherRows = order.materials.filter((m) => m.materialType === 'LEATHER').map((m) => ({
+      description: m.product.name,
+      quantitySF: m.consumedQty.gt(0) ? m.consumedQty : m.plannedQty,
+      sfPrice: m.unitCost ?? m.product.costPrice,
+      total: (m.consumedQty.gt(0) ? m.consumedQty : m.plannedQty).times(
+        m.unitCost ?? m.product.costPrice,
+      ),
+    }));
+
+    const accessoryRows = order.materials.filter((m) => m.materialType === 'ACCESSORY').map((m) => ({
+      name: m.product.name,
+      quantity: m.consumedQty.gt(0) ? m.consumedQty : m.plannedQty,
+      price: m.unitCost ?? m.product.costPrice,
+      total: (m.consumedQty.gt(0) ? m.consumedQty : m.plannedQty).times(
+        m.unitCost ?? m.product.costPrice,
+      ),
+    }));
+
+    const leatherTotal = leatherRows.reduce((s, r) => s.plus(r.total), ZERO);
+    const accessoriesTotal = accessoryRows.reduce((s, r) => s.plus(r.total), ZERO);
+
+    const labourEntries = order.costEntries.filter((e) => e.type === 'LABOUR');
+    const otherEntries = order.costEntries.filter((e) => e.type !== 'LABOUR');
+    const wagesTotal = labourEntries.reduce((s, e) => s.plus(e.amount), ZERO);
+    const otherTotal = otherEntries.reduce((s, e) => s.plus(e.amount), ZERO);
+
+    const totalCost = leatherTotal.plus(accessoriesTotal).plus(wagesTotal).plus(otherTotal);
+    const quantity = order.producedQty.gt(0) ? order.producedQty : order.plannedQty;
+    const perUnitCost = quantity.gt(0) ? totalCost.dividedBy(quantity).toDecimalPlaces(2) : ZERO;
+    const profit = order.saleAmount ? order.saleAmount.minus(totalCost) : null;
+
+    return {
+      header: {
+        serialNo: order.number,
+        date: order.actualEndDate ?? order.plannedEndDate,
+        buyerName: order.buyerName ?? '',
+        batchName: order.batchName ?? '',
+        branchName: order.branch.name,
+      },
+      costSummary: {
+        leather: leatherTotal,
+        accessories: accessoriesTotal,
+        wages: wagesTotal,
+        otherEntries: otherEntries.map((e) => ({ description: e.description, amount: e.amount })),
+        totalCost,
+        quantity,
+        perUnitCost,
+        saleAmount: order.saleAmount,
+        profit,
+      },
+      leatherTable: { rows: leatherRows, grandTotal: leatherTotal },
+      accessoriesTable: { rows: accessoryRows, grandTotal: accessoriesTotal },
+    };
   },
 };

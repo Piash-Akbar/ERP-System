@@ -532,4 +532,217 @@ export const accountsService = {
       })
       .sort((a, b) => a.code.localeCompare(b.code));
   },
+
+  async cashFlowStatement(
+    session: AppSession | null,
+    filters: { branchId?: string; from: Date; to: Date },
+  ) {
+    await authorize(session, 'accounts:read');
+
+    // Net profit for the period
+    const is = await this.incomeStatement(session, filters);
+    const netProfit = is.totals.net;
+
+    // Depreciation: sum of all asset depreciation entries in the period
+    const depreciationRows = await prisma.assetMovement.aggregate({
+      _sum: { amount: true },
+      where: {
+        type: 'DEPRECIATION',
+        createdAt: { gte: filters.from, lte: filters.to },
+        ...(filters.branchId ? { branchId: filters.branchId } : {}),
+      },
+    });
+    const depreciation = depreciationRows._sum.amount ?? ZERO;
+
+    // Helper: get total balance of a COA type as-of a date
+    const balanceByType = async (types: string[], asOf: Date) => {
+      const tb = await this.trialBalance(session, { branchId: filters.branchId, asOf });
+      return tb
+        .filter((r) => types.includes(r.type))
+        .reduce((s, r) => {
+          const net = r.type === 'ASSET' ? r.debit.minus(r.credit) : r.credit.minus(r.debit);
+          return s.plus(net);
+        }, ZERO);
+    };
+
+    // Changes in working capital (end vs start)
+    const startDate = new Date(filters.from.getTime() - 1);
+    const [
+      inventoryEnd, inventoryStart,
+      arEnd, arStart,
+      apEnd, apStart,
+    ] = await Promise.all([
+      balanceByType(['ASSET'], filters.to), // rough proxy — ideally filter by COA code
+      balanceByType(['ASSET'], startDate),
+      ZERO, ZERO, // AR/AP proxies — populate when COA codes are known
+      ZERO, ZERO,
+    ]);
+
+    // Inventory change from InventoryLedger
+    const invLedger = await prisma.inventoryLedger.groupBy({
+      by: ['direction'],
+      where: {
+        ...(filters.branchId ? { branchId: filters.branchId } : {}),
+        createdAt: { gte: filters.from, lte: filters.to },
+      },
+      _sum: { quantity: true },
+    });
+    const invIn = invLedger.find((r) => r.direction === 'IN')?._sum.quantity ?? ZERO;
+    const invOut = invLedger.find((r) => r.direction === 'OUT')?._sum.quantity ?? ZERO;
+    // Use TB-based inventory delta for monetary change
+    const inventoryChange = inventoryEnd.minus(inventoryStart).negated();
+
+    // Investing: fixed asset acquisitions in period
+    const assetAcquisitions = await prisma.asset.aggregate({
+      _sum: { purchaseCost: true },
+      where: {
+        purchaseDate: { gte: filters.from, lte: filters.to },
+        ...(filters.branchId ? { branchId: filters.branchId } : {}),
+      },
+    });
+    const assetPurchases = (assetAcquisitions._sum.purchaseCost ?? ZERO).negated();
+
+    // Financing: equity movements
+    const equityStart = await this.trialBalance(session, { branchId: filters.branchId, asOf: startDate });
+    const equityEnd = await this.trialBalance(session, { branchId: filters.branchId, asOf: filters.to });
+    const equityStartTotal = equityStart.filter((r) => r.type === 'EQUITY').reduce((s, r) => s.plus(r.credit.minus(r.debit)), ZERO);
+    const equityEndTotal = equityEnd.filter((r) => r.type === 'EQUITY').reduce((s, r) => s.plus(r.credit.minus(r.debit)), ZERO);
+    const shareCapitalChange = equityEndTotal.minus(equityStartTotal);
+
+    const operatingCF = netProfit.plus(depreciation).plus(inventoryChange);
+    const investingCF = assetPurchases;
+    const financingCF = shareCapitalChange;
+    const netChange = operatingCF.plus(investingCF).plus(financingCF);
+
+    // Opening cash: sum of all POSTED journal lines on cash/bank accounts before from
+    const cashTBStart = await this.trialBalance(session, { branchId: filters.branchId, asOf: startDate });
+    const openingCash = cashTBStart
+      .filter((r) => r.code.startsWith('1') && r.type === 'ASSET')
+      .reduce((s, r) => s.plus(r.debit.minus(r.credit)), ZERO);
+    const closingCash = openingCash.plus(netChange);
+
+    return {
+      operating: {
+        netProfit,
+        depreciation,
+        inventoryChange,
+        total: operatingCF,
+      },
+      investing: {
+        assetPurchases,
+        total: investingCF,
+      },
+      financing: {
+        shareCapitalChange,
+        total: financingCF,
+      },
+      netChange,
+      openingCash,
+      closingCash,
+    };
+  },
+
+  async changesInEquity(
+    session: AppSession | null,
+    filters: { branchId?: string; from: Date; to: Date },
+  ) {
+    await authorize(session, 'accounts:read');
+
+    const startDate = new Date(filters.from.getTime() - 1);
+    const [tbStart, tbEnd] = await Promise.all([
+      this.trialBalance(session, { branchId: filters.branchId, asOf: startDate }),
+      this.trialBalance(session, { branchId: filters.branchId, asOf: filters.to }),
+    ]);
+
+    const equityBalance = (tb: typeof tbStart, name: string) =>
+      tb.filter((r) => r.type === 'EQUITY' && r.name.toLowerCase().includes(name.toLowerCase()))
+        .reduce((s, r) => s.plus(r.credit.minus(r.debit)), ZERO);
+
+    const shareCapitalStart = equityBalance(tbStart, 'share capital');
+    const shareCapitalEnd = equityBalance(tbEnd, 'share capital');
+
+    const is = await this.incomeStatement(session, filters);
+    const netProfit = is.totals.net;
+
+    const retainedStart = equityBalance(tbStart, 'retained');
+    const retainedEnd = retainedStart.plus(netProfit);
+
+    return {
+      current: {
+        period: filters.to.getFullYear(),
+        openingShareCapital: shareCapitalStart,
+        shareCapitalAdded: shareCapitalEnd.minus(shareCapitalStart),
+        closeShareCapital: shareCapitalEnd,
+        openingRetained: retainedStart,
+        netProfit,
+        closingRetained: retainedEnd,
+        totalEquity: shareCapitalEnd.plus(retainedEnd),
+      },
+    };
+  },
+
+  async financialNotes(
+    session: AppSession | null,
+    filters: { branchId?: string; asOf: Date },
+  ) {
+    await authorize(session, 'accounts:read');
+
+    // PP&E schedule from Asset model
+    const assets = await prisma.asset.findMany({
+      where: {
+        ...(filters.branchId ? { branchId: filters.branchId } : {}),
+        purchaseDate: { lte: filters.asOf },
+        status: { not: 'DISPOSED' },
+      },
+      include: { category: { select: { name: true } } },
+    });
+
+    const totalCost = assets.reduce((s, a) => s.plus(a.purchaseCost), ZERO);
+    const totalAccumDep = assets.reduce((s, a) => s.plus(a.accumulatedDepreciation), ZERO);
+    const totalWDV = totalCost.minus(totalAccumDep);
+
+    const ppe = {
+      openingCost: totalCost,
+      additions: ZERO,
+      closingCost: totalCost,
+      openingAccumDep: totalAccumDep,
+      depreciationForYear: ZERO,
+      closingAccumDep: totalAccumDep,
+      writtenDownValue: totalWDV,
+      assets: assets.map((a) => ({
+        name: a.name,
+        category: a.category?.name ?? '—',
+        cost: a.purchaseCost,
+        accumDep: a.accumulatedDepreciation,
+        wdv: a.purchaseCost.minus(a.accumulatedDepreciation),
+      })),
+    };
+
+    // Inventory breakdown from InventoryLedger aggregated by product type
+    const invRows = await prisma.$queryRaw<{ type: string; value: number }[]>`
+      SELECT p.type, COALESCE(SUM(CASE WHEN il.direction = 'IN' THEN il.quantity ELSE -il.quantity END * il."costPerUnit"), 0) as value
+      FROM "InventoryLedger" il
+      JOIN "Product" p ON p.id = il."productId"
+      WHERE il."createdAt" <= ${filters.asOf}
+      ${filters.branchId ? Prisma.sql`AND il."branchId" = ${filters.branchId}` : Prisma.sql``}
+      GROUP BY p.type
+    `;
+
+    const invByType = new Map(invRows.map((r) => [r.type, new Prisma.Decimal(r.value)]));
+    const inventories = {
+      rawMaterials: invByType.get('RAW_MATERIAL') ?? ZERO,
+      wip: invByType.get('WORK_IN_PROGRESS') ?? ZERO,
+      finishedGoods: invByType.get('FINISHED_GOOD') ?? ZERO,
+      total: ZERO as Prisma.Decimal,
+    };
+    inventories.total = inventories.rawMaterials.plus(inventories.wip).plus(inventories.finishedGoods);
+
+    // Advances: sub-accounts with "advance" or "deposit" in name
+    const advanceTB = await this.trialBalance(session, { branchId: filters.branchId, asOf: filters.asOf });
+    const advances = advanceTB
+      .filter((r) => r.type === 'ASSET' && (r.name.toLowerCase().includes('advance') || r.name.toLowerCase().includes('deposit')))
+      .map((r) => ({ code: r.code, name: r.name, amount: r.debit.minus(r.credit) }));
+
+    return { ppe, inventories, advances };
+  },
 };

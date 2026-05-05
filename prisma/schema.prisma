@@ -4,6 +4,7 @@
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -249,6 +250,12 @@ enum ProductionCostType {
   OVERHEAD
   WEDGE
   LABOUR
+}
+
+enum ProductionMaterialType {
+  LEATHER
+  ACCESSORY
+  OTHER
 }
 
 enum AssetStatus {
@@ -1021,6 +1028,9 @@ model ProductionOrder {
   actualEndDate    DateTime?
   notes            String?
   overheadRate     Decimal?              @db.Decimal(7, 4)
+  buyerName        String?
+  batchName        String?
+  saleAmount       Decimal?              @db.Decimal(18, 4)
   createdById      String?
 
   stages      ProductionStage[]
@@ -1061,7 +1071,9 @@ model ProductionMaterial {
   plannedQty      Decimal         @db.Decimal(18, 4)
   consumedQty     Decimal         @default(0) @db.Decimal(18, 4)
   fromWarehouseId String?
-  fromWarehouse   Warehouse?      @relation("ProductionMaterialFromWarehouse", fields: [fromWarehouseId], references: [id])
+  fromWarehouse   Warehouse?             @relation("ProductionMaterialFromWarehouse", fields: [fromWarehouseId], references: [id])
+  materialType    ProductionMaterialType @default(OTHER)
+  unitCost        Decimal?               @db.Decimal(18, 4)
   note            String?
 
   @@index([orderId])
@@ -1942,6 +1954,7 @@ model CorporateInvoiceItem {
   productId    String
   product      Product            @relation(fields: [productId], references: [id])
   description  String?
+  colorDesign  String?
   quantity     Decimal            @db.Decimal(18, 4)
   unitPrice    Decimal            @db.Decimal(18, 4)
   discountRate Decimal            @default(0) @db.Decimal(5, 2)

@@ -51,6 +51,11 @@ export default async function InvoiceDetailPage({
             <ArrowLeft className="h-4 w-4" /> All invoices
           </Link>
         </Button>
+        <Button variant="secondary" asChild>
+          <Link href={`/corporate-sales/invoices/${invoice.id}/print`}>
+            Print Invoice
+          </Link>
+        </Button>
       </PageHeader>
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-6">

@@ -30,10 +30,14 @@ export const UNITS = [
   'SET',
 ] as const;
 
+export const PRODUCTION_MATERIAL_TYPES = ['LEATHER', 'ACCESSORY', 'OTHER'] as const;
+
 const materialSchema = z.object({
   productId: z.string().cuid(),
   unit: z.enum(UNITS).default('PCS'),
   plannedQty: z.coerce.number().positive('Planned qty must be > 0'),
+  unitCost: z.coerce.number().min(0).optional(),
+  materialType: z.enum(PRODUCTION_MATERIAL_TYPES).default('OTHER'),
   fromWarehouseId: z.string().cuid().optional().or(z.literal('')),
   note: z.string().trim().max(300).optional().or(z.literal('')),
 });
@@ -52,6 +56,9 @@ export const productionOrderCreateSchema = z.object({
   plannedStartDate: z.coerce.date(),
   plannedEndDate: z.coerce.date(),
   notes: z.string().trim().max(1000).optional().or(z.literal('')),
+  buyerName: z.string().trim().max(200).optional().or(z.literal('')),
+  batchName: z.string().trim().max(200).optional().or(z.literal('')),
+  saleAmount: z.coerce.number().min(0).optional(),
   materials: z.array(materialSchema).default([]),
   stages: z.array(stageSchema).default([]),
 });

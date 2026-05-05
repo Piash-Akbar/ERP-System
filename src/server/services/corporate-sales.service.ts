@@ -736,7 +736,8 @@ export const corporateService = {
       include: {
         items: { include: { product: { select: { sku: true, name: true, unit: true } } } },
         payments: { orderBy: { paidAt: 'desc' } },
-        customer: { select: { id: true, code: true, name: true, currency: true } },
+        customer: { select: { id: true, code: true, name: true, currency: true, address: true, city: true, phone: true } },
+        branch: { select: { id: true, name: true, address: true, phone: true, email: true } },
         order: { select: { id: true, number: true, status: true } },
       },
     });
