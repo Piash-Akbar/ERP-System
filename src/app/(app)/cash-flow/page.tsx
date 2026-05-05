@@ -1,6 +1,4 @@
-import { Suspense } from 'react';
 import { TrendingUp, TrendingDown, ArrowRightLeft, Download } from 'lucide-react';
-import { Prisma } from '@prisma/client';
 import { getSession } from '@/server/auth/session';
 import { reportsService } from '@/server/services/reports.service';
 import { branchService } from '@/server/services/branch.service';
